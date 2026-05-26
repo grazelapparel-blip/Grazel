@@ -6,7 +6,6 @@
 - [ ] All dependencies are in `package.json`
 - [ ] Backend and frontend tested locally
 - [ ] MongoDB Atlas account created with connection string
-- [ ] Supabase project created with API keys
 
 ## Frontend Deployment (Vercel)
 - [ ] GitHub repository created
@@ -17,8 +16,6 @@
   - [ ] Build Command: `npm run build`
   - [ ] Output Directory: `dist`
 - [ ] Environment variables added:
-  - [ ] `VITE_SUPABASE_URL`
-  - [ ] `VITE_SUPABASE_ANON_KEY`
   - [ ] `VITE_API_URL` (after backend URL is ready)
 - [ ] Frontend deployed successfully
 
@@ -27,8 +24,6 @@
 - [ ] Connect GitHub repository
 - [ ] Configure environment variables:
   - [ ] `MONGODB_URI`
-  - [ ] `SUPABASE_URL`
-  - [ ] `SUPABASE_ANON_KEY`
   - [ ] `PORT` = 5000
   - [ ] `NODE_ENV` = production
 - [ ] Set start command: `npm run server`
@@ -46,7 +41,6 @@
 
 ## CORS Configuration
 - [ ] Backend allows frontend domain in `cors()` config
-- [ ] Frontend domain whitelisted in MongoDB Atlas (if using IP whitelist)
 
 ## Monitoring
 - [ ] Set up email alerts for deployment failures

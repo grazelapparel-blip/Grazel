@@ -4,10 +4,8 @@
   "devCommand": "npm run dev",
   "env": [
     "MONGODB_URI",
-    "SUPABASE_URL",
-    "SUPABASE_ANON_KEY",
-    "VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY"
+    "NODE_ENV",
+    "PORT"
   ],
   "functions": {
     "api/**/*.js": {

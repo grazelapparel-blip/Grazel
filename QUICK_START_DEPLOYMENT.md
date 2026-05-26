@@ -14,10 +14,8 @@ notepad .env.local
 Fill in:
 ```
 MONGODB_URI=mongodb+srv://YOUR_USER:YOUR_PASS@cluster.mongodb.net/grazel
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_ANON_KEY=xxxxxxxxxxxxx
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=xxxxxxxxxxxxx
+NODE_ENV=development
+PORT=5000
 ```
 
 ### Step 2: Push to GitHub (5 min)
@@ -37,10 +35,9 @@ git push -u origin main
 4. Click "Import"
 5. Settings auto-fill (Vite detected)
 6. Go to **Settings → Environment Variables**
-7. Add these variables:
+7. Add environment variable:
    ```
-   VITE_SUPABASE_URL = your_supabase_url
-   VITE_SUPABASE_ANON_KEY = your_anon_key
+   VITE_API_URL = https://your-railway-url.up.railway.app
    ```
 8. Click "Deploy"
 9. Wait for deployment ✅
@@ -61,8 +58,7 @@ git push -u origin main
    MONGODB_URI = your_mongodb_uri
    PORT = 5000
    NODE_ENV = production
-   SUPABASE_URL = your_supabase_url
-   SUPABASE_ANON_KEY = your_anon_key
+
    ```
 10. Click "Deploy"
 11. Wait for deployment ✅
@@ -139,12 +135,8 @@ curl https://your-railway-url/api/health
 
 | Service | Variable | Status |
 |---------|----------|--------|
-| Vercel (Frontend) | VITE_SUPABASE_URL | ⬜ |
-| Vercel (Frontend) | VITE_SUPABASE_ANON_KEY | ⬜ |
 | Vercel (Frontend) | VITE_API_URL | ⬜ |
 | Railway (Backend) | MONGODB_URI | ⬜ |
-| Railway (Backend) | SUPABASE_URL | ⬜ |
-| Railway (Backend) | SUPABASE_ANON_KEY | ⬜ |
 | Railway (Backend) | PORT | ✅ (5000) |
 | Railway (Backend) | NODE_ENV | ✅ (production) |
 

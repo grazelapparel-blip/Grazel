@@ -24,8 +24,6 @@ This guide covers deploying your full-stack application (React frontend + Expres
 3. **MongoDB Atlas Account** - For cloud database at [mongodb.com/cloud](https://mongodb.com/cloud)
 4. **Environment Variables Ready**:
    - `MONGODB_URI` - MongoDB connection string
-   - `SUPABASE_URL` - Supabase project URL
-   - `SUPABASE_ANON_KEY` - Supabase anonymous key
 
 ---
 
@@ -45,10 +43,8 @@ git push -u origin main
 Copy `.env.example` to `.env.local` and fill in your values:
 ```
 MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/grazel
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=xxx
-VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=xxx
+NODE_ENV=development
+PORT=5000
 ```
 
 ### 1.3 Update Backend Configuration
@@ -79,10 +75,9 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 In the Vercel dashboard:
 1. Go to **Settings** → **Environment Variables**
 2. Add the following:
-   - `VITE_SUPABASE_URL` → Your Supabase URL
-   - `VITE_SUPABASE_ANON_KEY` → Your Supabase anon key
+   - `VITE_API_URL` → Your backend URL (add after backend deployment)
 
-**Important**: Prefix with `VITE_` so they're accessible in the frontend
+**Note**: Frontend doesn't need Supabase or MongoDB variables - those are backend only
 
 3. Click "Deploy"
 
@@ -106,8 +101,6 @@ In the Vercel dashboard:
    MONGODB_URI=your_mongodb_connection_string
    PORT=5000
    NODE_ENV=production
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 3. Click "Deploy"
 
@@ -132,7 +125,12 @@ After deployment, Railway provides a URL like: `https://grazel-production.up.rai
 
 #### 3B.2 Add Environment Variables
 1. Go to **Environment**
-2. Add all variables from `.env.example`
+2. Add:
+   ```
+   MONGODB_URI=your_mongodb_connection_string
+   PORT=5000
+   NODE_ENV=production
+   ```
 
 #### 3B.3 Deploy
 Click "Create Web Service" and wait for deployment
@@ -285,10 +283,8 @@ Similar process on Railway/Render dashboard
 | Variable | Type | Example |
 |----------|------|---------|
 | `MONGODB_URI` | Backend | `mongodb+srv://user:pass@cluster.mongodb.net/grazel` |
-| `SUPABASE_URL` | Backend | `https://xxx.supabase.co` |
-| `SUPABASE_ANON_KEY` | Backend | `eyJxxx...` |
-| `VITE_SUPABASE_URL` | Frontend | `https://xxx.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Frontend | `eyJxxx...` |
+| `NODE_ENV` | Backend | `production` |
+| `PORT` | Backend | `5000` |
 | `VITE_API_URL` | Frontend | `https://grazel-api.railway.app` |
 
 ---
