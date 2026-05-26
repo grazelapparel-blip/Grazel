@@ -15,8 +15,12 @@ import User from './models/User.js';
 
 dotenv.config();
 
-const app = express();
+// Environment Configuration
+const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/grazel';
+
+const app = express();
 
 // Middleware
 app.use(cors());
@@ -288,16 +292,14 @@ const seedDatabase = async () => {
 
 // Database Connection & Server Startup
 const connectDB = async () => {
-  const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/grazel';
-  
   try {
-    await mongoose.connect(mongoURI);
+    await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB database successfully.');
     await seedDatabase();
     await seedMeasurements();
     
     app.listen(PORT, () => {
-      console.log(`Express server running in development mode on port ${PORT}`);
+      console.log(`Express server running in ${NODE_ENV} mode on port ${PORT}`);
     });
   } catch (err) {
     console.error('MongoDB database connection failure:', err);
