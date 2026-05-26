@@ -1,0 +1,20 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "devCommand": "npm run dev",
+  "env": [
+    "MONGODB_URI",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "VITE_SUPABASE_URL",
+    "VITE_SUPABASE_ANON_KEY"
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    },
+    "server/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
+}
