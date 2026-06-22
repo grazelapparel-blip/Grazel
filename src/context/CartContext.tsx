@@ -19,6 +19,11 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// Helper function to normalize product ID
+const getProductId = (product: Product): string => {
+  return product.id || (product as any)._id;
+};
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -37,7 +42,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // 2. Fetch/merge cart based on Auth state
   useEffect(() => {
     const handleAuthCartSync = async () => {
-      const token = localStorage.getItem('grazel_token');
+      const token = localStorage.getItem('grazel_user_token');
       if (user && token) {
         // First merge any items from local storage guest cart
         const localCartStr = localStorage.getItem('grazel_cart');
@@ -52,7 +57,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             console.error('Failed to merge guest cart to backend:', err);
           }
         }
-        // Load the full cart from MongoDB
+        // Load the full cart from Supabase via backend
         await fetchDatabaseCart(token);
       } else {
         // Load cart from localStorage for guest users
@@ -80,10 +85,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        setCart(data as CartItem[]);
+        if (Array.isArray(data)) {
+          // Only accept items that have a full product object (new format)
+          // Items stored in old simplified format {productId, size, quantity} are discarded
+          const validItems = data.filter(
+            (item: any) => item && item.product && item.product.id
+          ) as CartItem[];
+          setCart(validItems);
+        } else {
+          setCart([]);
+        }
+      } else {
+        console.error('Failed to fetch cart:', response.status);
+        setCart([]);
       }
     } catch (err) {
-      console.error('Failed to fetch user cart from MongoDB:', err);
+      console.error('Failed to fetch user cart:', err);
+      setCart([]);
     }
   };
 
@@ -95,37 +113,46 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          items: newCart.map((item) => ({
-            productId: item.product.id || (item.product as any)._id,
-            size: item.size,
-            quantity: item.quantity,
-          })),
-        }),
+        // Store full CartItem objects (including product) so they can be reconstructed on fetch
+        body: JSON.stringify({ items: newCart }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setCart(data as CartItem[]);
+        const validItems = Array.isArray(data)
+          ? (data.filter((item: any) => item && item.product && item.product.id) as CartItem[])
+          : newCart;
+        setCart(validItems);
+      } else {
+        throw new Error('Failed to sync cart');
       }
     } catch (err) {
-      console.error('Failed to sync cart with Express backend:', err);
+      console.error('Failed to sync cart with backend:', err);
+      // On sync failure, keep the local cart state so user isn't lost
+      setCart(newCart);
+      throw err;
     }
   };
 
   const addToCart = async (product: Product, size: string, quantity = 1) => {
-    const token = localStorage.getItem('grazel_token');
+    if (!product || !getProductId(product)) {
+      toast.error('Invalid product');
+      return;
+    }
+
+    const token = localStorage.getItem('grazel_user_token');
+    const productId = getProductId(product);
     
     // Compute new cart locally first
     const prevCart = [...cart];
     const existing = prevCart.find(
-      (item) => (item.product.id === product.id || (item.product as any)._id === (product as any)._id) && item.size === size
+      (item) => getProductId(item.product) === productId && item.size === size
     );
 
     let newCart;
     if (existing) {
       newCart = prevCart.map((item) =>
-        (item.product.id === product.id || (item.product as any)._id === (product as any)._id) && item.size === size
+        getProductId(item.product) === productId && item.size === size
           ? { ...item, quantity: item.quantity + quantity }
           : item
       );
@@ -134,10 +161,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (user && token) {
-      // Optimistically update local state then sync
-      setCart(newCart);
-      await syncCartToBackend(newCart, token);
-      toast.success(product.isPreOrder ? 'Pre-order added to bag' : 'Added to bag');
+      try {
+        // Sync to backend before updating local state
+        await syncCartToBackend(newCart, token);
+        toast.success(product.isPreOrder ? 'Pre-order added to bag' : 'Added to bag');
+      } catch (err) {
+        // Revert on failure
+        setCart(prevCart);
+      }
     } else {
       setCart(newCart);
       localStorage.setItem('grazel_cart', JSON.stringify(newCart));
@@ -146,9 +177,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeFromCart = async (productId: string, size: string) => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_user_token');
+    if (!productId) return;
+
     const newCart = cart.filter(
-      (item) => !((item.product.id === productId || (item.product as any)._id === productId) && item.size === size)
+      (item) => !(getProductId(item.product) === productId && item.size === size)
     );
 
     if (user && token) {
@@ -168,9 +201,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_user_token');
     const newCart = cart.map((item) =>
-      (item.product.id === productId || (item.product as any)._id === productId) && item.size === size
+      getProductId(item.product) === productId && item.size === size
         ? { ...item, quantity }
         : item
     );
@@ -185,8 +218,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addToWishlist = (product: Product) => {
+    if (!product || !getProductId(product)) {
+      toast.error('Invalid product');
+      return;
+    }
     setWishlist((prev) => {
-      if (prev.some((item) => item.product.id === product.id || (item.product as any)._id === (product as any)._id)) {
+      const productId = getProductId(product);
+      if (prev.some((item) => getProductId(item.product) === productId)) {
         return prev;
       }
       const updated = [...prev, { product }];
@@ -198,7 +236,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeFromWishlist = (productId: string) => {
     setWishlist((prev) => {
-      const updated = prev.filter((item) => item.product.id !== productId && (item.product as any)._id !== productId);
+      const updated = prev.filter((item) => getProductId(item.product) !== productId);
       localStorage.setItem('grazel_wishlist', JSON.stringify(updated));
       return updated;
     });
@@ -206,23 +244,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isInWishlist = (productId: string) => {
-    return wishlist.some((item) => item.product.id === productId || (item.product as any)._id === productId);
+    return wishlist.some((item) => getProductId(item.product) === productId);
   };
 
-  const cartTotal = cart.reduce(
-    (total, item) => total + item.product.price * item.quantity,
-    0
-  );
+  const cartTotal = cart.reduce((total, item) => {
+    const price = item.product?.price || 0;
+    return total + price * item.quantity;
+  }, 0);
 
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
 
   const clearCart = async () => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_user_token');
+    setCart([]);
     if (user && token) {
-      setCart([]);
-      await syncCartToBackend([], token);
+      try {
+        await syncCartToBackend([], token);
+      } catch {
+        // Cart already cleared locally; ignore sync errors on clear
+      }
     } else {
-      setCart([]);
       localStorage.removeItem('grazel_cart');
     }
   };

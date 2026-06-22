@@ -1,0 +1,35 @@
+Failed to execute 'json' on 'Response': Unexpected end of JSON input
+
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+ProductContext.tsx:40 API error fetching products, using fallback
+(anonymous) @ ProductContext.tsx:40
+GoogleAuthButton.tsx:55 Google Sign-In initialized
+button?theme=outline&size=large&type=standard&shape=rectangular&text=continue_with&width=334&is_fed…:1  Failed to load resource: the server responded with a status of 403 ()
+m=credential_button_library:88 [GSI_LOGGER]: The given origin is not allowed for the given client ID.
+_.H @ m=credential_button_library:88
+client:383 Cross-Origin-Opener-Policy policy would block the window.postMessage call.
+Su @ client:383
+client:383 Cross-Origin-Opener-Policy policy would block the window.postMessage call.
+Su @ client:383
+api/auth/google:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+AuthContext.tsx:137 Google Login Error: SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input
+    at signInWithGoogle (AuthContext.tsx:126:35)
+    at async Vs.handleGoogleCallback [as callback] (GoogleAuthButton.tsx:108:23)
+(anonymous) @ AuthContext.tsx:137
+GoogleAuthButton.tsx:121 Google auth error: SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input
+    at signInWithGoogle (AuthContext.tsx:126:35)
+    at async Vs.handleGoogleCallback [as callback] (GoogleAuthButton.tsx:108:23)
+
+    Failed to load resource: the server responded with a status of 403 ()
+m=credential_button_library:88 [GSI_LOGGER]: The given client ID is not found.
+
+
+Sign in with Google
+
+# Access blocked: Authorization Error
+![](https://lh3.googleusercontent.com/a/ACg8ocJmiRMpA0C9JZOjCJ2me_ZYEujOLhZutNhYkvYxn-qC9B15_w=s128-c-mo)
+xxx@gmail.com
+
+The OAuth client was deleted.
+If you are a developer of this app, see error details.
+Error 401: deleted_client

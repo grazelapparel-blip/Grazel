@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Check active token on mount
   useEffect(() => {
     const loadUser = async () => {
-      const token = localStorage.getItem('grazel_token');
+      const token = localStorage.getItem('grazel_user_token');
       if (!token) {
         setLoading(false);
         return;
@@ -51,18 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('grazel_user_id', data.id);
         } else {
           // Token expired or invalid
-          localStorage.removeItem('grazel_token');
+          localStorage.removeItem('grazel_user_token');
           setUser(null);
         }
       } catch (err) {
         console.error('Failed to verify token on startup:', err);
-        // Offline or unconfigured fallback
-        const storedUser = localStorage.getItem('grazel_fallback_user');
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-          } catch {}
-        }
+        localStorage.removeItem('grazel_user_token');
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -85,29 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json();
-      localStorage.setItem('grazel_token', data.token);
+      // Only accept user role for regular login
+      if (data.user.role === 'admin') {
+        throw new Error('Admin users must log in through the admin panel.');
+      }
+      localStorage.setItem('grazel_user_token', data.token);
       localStorage.setItem('grazel_user_id', data.user.id);
       setUser(data.user as UserType);
       return true;
     } catch (err: any) {
-      console.warn('Login connection failed, using local mock fallback:', err.message);
-      
-      // Standalone mockup developer fallback
-      if (email === 'admin@grazel.com' && password === 'admin123') {
-        const mockAdmin: UserType = {
-          id: 'admin-fallback-id',
-          name: 'Developer Admin',
-          email: 'admin@grazel.com',
-          role: 'admin',
-        };
-        setUser(mockAdmin);
-        localStorage.setItem('grazel_fallback_user', JSON.stringify(mockAdmin));
-        localStorage.setItem('grazel_token', 'mock-admin-token');
-        localStorage.setItem('grazel_user_id', mockAdmin.id);
-        return true;
-      } else {
-        throw err;
-      }
+      console.error('Login error:', err.message);
+      throw err;
     }
   };
 
@@ -122,6 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Registration failed');
+      }
+
+      const data = await response.json();
+      // Auto-login after successful registration
+      if (data.token && data.user) {
+        localStorage.setItem('grazel_user_token', data.token);
+        localStorage.setItem('grazel_user_id', data.user.id);
+        setUser(data.user as UserType);
       }
 
       return true;
@@ -150,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.message || 'Google authentication failed');
       }
 
-      localStorage.setItem('grazel_token', data.token);
+      localStorage.setItem('grazel_user_token', data.token);
       localStorage.setItem('grazel_user_id', data.user.id);
       setUser(data.user as UserType);
       return true;
@@ -162,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setLoading(true);
-    localStorage.removeItem('grazel_token');
+    localStorage.removeItem('grazel_user_token');
     localStorage.removeItem('grazel_fallback_user');
     localStorage.removeItem('grazel_user');
     localStorage.removeItem('grazel_user_id');

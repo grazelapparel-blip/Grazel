@@ -40,7 +40,7 @@ export function ProductPage() {
 
     const loadReviews = async () => {
       try {
-        const response = await fetch(`/api/reviews/product/${id}`);
+        const response = await fetch(`/api/reviews?productId=${id}`);
         if (!response.ok) throw new Error('Failed to load reviews');
         const data = await response.json();
         setReviews(data);

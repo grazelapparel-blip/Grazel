@@ -14,16 +14,16 @@ export function MegaMenu({ data, onClose }: MegaMenuProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="absolute top-full left-0 w-full bg-background-cream border-b border-border shadow-lg z-50"
+      className="absolute top-full left-0 w-full bg-background-cream border-b border-border shadow-lg z-50 hidden lg:block"
       onMouseLeave={onClose}
     >
       <div className="container py-12">
-        <div className="grid grid-cols-5 gap-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 lg:gap-0">
           {/* Menu Columns */}
           {data.columns.map((column, index) => (
             <div
               key={column.title}
-              className={`pr-10 ${index < data.columns.length - 1 ? 'mega-menu-column' : ''}`}
+              className={`pr-0 md:pr-6 lg:pr-10 ${index < data.columns.length - 1 ? 'mega-menu-column' : ''}`}
             >
               <h3 className="font-serif text-sm font-medium text-foreground mb-5 tracking-wide">
                 {column.title}
@@ -46,7 +46,7 @@ export function MegaMenu({ data, onClose }: MegaMenuProps) {
 
           {/* Featured Image - Calm, no hover effects */}
           {data.featured && (
-            <div className="pl-10">
+            <div className="pl-0 md:pl-6 lg:pl-10 hidden md:block">
               <Link
                 to={data.featured.href}
                 onClick={onClose}

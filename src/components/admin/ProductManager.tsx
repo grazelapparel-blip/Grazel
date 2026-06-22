@@ -169,11 +169,10 @@ export function ProductManager({ onProductsChange }: ProductManagerProps) {
       return;
     }
 
-    // Validate that at least one real image is added (not placeholder)
+    // Warn if only placeholder image, but don't block saving
     const hasRealImages = imageUrls.some(img => img !== '/placeholder.svg');
     if (!hasRealImages) {
-      toast.error('⚠️ Please add at least one product image URL before saving');
-      return;
+      toast.warning('No product images added — using placeholder. You can update images later.');
     }
 
     const productData: Product = {

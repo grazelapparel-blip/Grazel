@@ -11,7 +11,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { ProductManager } from '@/components/admin/ProductManager';
-import { useAuth } from '@/context/AuthContext';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import { useProducts } from '@/context/ProductContext';
 import { toast } from 'sonner';
 
@@ -31,9 +31,16 @@ const CRIMSON_LIGHT = 'hsl(355 40% 55%)';
 const MUTED = 'hsl(25 6% 50%)';
 
 export function AdminDashboard() {
-  const { user, loading: authLoading, isAdmin, signOut } = useAuth();
+  const { admin, loading: authLoading, isAuthenticated, adminSignOut } = useAdminAuth();
   const { products, loading: productsLoading } = useProducts();
   const navigate = useNavigate();
+
+  // Redirect to admin login if not authenticated as admin
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   const [active, setActive] = useState('overview');
   const [loadingData, setLoadingData] = useState(false);
@@ -48,28 +55,15 @@ export function AdminDashboard() {
     productsCount: 0,
   });
 
-  // Authorization Route Protection
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        navigate('/admin/login', { state: { from: { pathname: '/admin' } } });
-      } else if (!isAdmin) {
-        toast.error('Access denied. Administrator privileges required.');
-        signOut();
-        navigate('/admin/login', { replace: true, state: { from: { pathname: '/admin' } } });
-      }
-    }
-  }, [user, isAdmin, authLoading, navigate, signOut]);
-
   // Load Admin Data on mount / authorization
   useEffect(() => {
-    if (isAdmin) {
+    if (isAuthenticated) {
       loadAdminData();
     }
-  }, [isAdmin, products]);
+  }, [isAuthenticated, products]);
 
   const loadAdminData = async () => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_admin_token');
     if (!token) return;
 
     setLoadingData(true);
@@ -84,12 +78,19 @@ export function AdminDashboard() {
       // Filter to show only regular users (not admins)
       const regularUsersData = allUsersData.filter((u: any) => u.role === 'user');
 
+
       // 2. Fetch Orders List
-      const ordersResponse = await fetch('/api/orders/all', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!ordersResponse.ok) throw new Error('Failed to load order registry');
-      const ordersData = await ordersResponse.json();
+      let ordersData: any[] = [];
+      try {
+        const ordersResponse = await fetch('/api/orders', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (ordersResponse.ok) {
+          ordersData = await ordersResponse.json();
+        }
+      } catch {
+        console.warn('Could not fetch orders — continuing without order data');
+      }
 
       // 3. Compute Metrics
       const activeOrders = ordersData || [];
@@ -114,7 +115,7 @@ export function AdminDashboard() {
   };
 
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_admin_token');
     if (!token) return;
 
     try {
@@ -142,7 +143,7 @@ export function AdminDashboard() {
     }
   };
 
-  if (authLoading || !user || !isAdmin) {
+  if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-background-cream flex items-center justify-center">
         <p className="text-sm text-muted-foreground uppercase tracking-widest animate-pulse">
@@ -467,12 +468,17 @@ function OrdersTab({ orders, onUpdateStatus }: { orders: any[]; onUpdateStatus: 
                             ? 'text-red-600 border-red-200 bg-red-50/50'
                             : o.status === 'Shipped'
                             ? 'text-blue-700 border-blue-200 bg-blue-50/50'
+                            : o.status === 'Returned'
+                            ? 'text-orange-700 border-orange-200 bg-orange-50/50'
                             : 'text-yellow-700 border-yellow-200 bg-yellow-50/50'
                         }`}
                       >
+                        <option value="Pending">Pending</option>
+                        <option value="Confirmed">Confirmed</option>
                         <option value="Processing">Processing</option>
                         <option value="Shipped">Shipped</option>
                         <option value="Delivered">Delivered</option>
+                        <option value="Returned">Returned</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
                     </div>
@@ -485,14 +491,14 @@ function OrdersTab({ orders, onUpdateStatus }: { orders: any[]; onUpdateStatus: 
                       <p><span className="font-semibold text-foreground">Customer Name:</span> {o.customer_name}</p>
                       <p><span className="font-semibold text-foreground">Customer Email:</span> {o.customer_email}</p>
                     </div>
-                    {o.order_items?.map((item: any) => (
+                    {(o.items || o.order_items || []).map((item: any) => (
                       <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between text-sm">
                         <div className="space-y-0.5">
-                          <p className="font-medium text-foreground">{item.product_name}</p>
+                          <p className="font-medium text-foreground">{item.productName || item.product_name}</p>
                           <p className="text-xs text-muted-foreground">Size: {item.size} &middot; Qty: {item.quantity}</p>
-                          {item.is_pre_order && (
+                          {(item.isPreOrder || item.is_pre_order) && (
                             <p className="text-xs text-primary">
-                              Pre-order{item.pre_order_message ? ` · ${item.pre_order_message}` : ''}
+                              Pre-order{(item.preOrderMessage || item.pre_order_message) ? ` · ${item.preOrderMessage || item.pre_order_message}` : ''}
                             </p>
                           )}
                         </div>
@@ -526,9 +532,11 @@ function StockTab({ products }: { products: any[] }) {
   products.forEach((p) => {
     p.sizes?.forEach((size: string) => {
       stockItems.push({
-        sku: `${p.name.slice(0, 3).toUpperCase()}-${p.color?.slice(0, 2).toUpperCase()}-${size}`,
-        name: `${p.name} &middot; {color} &middot; ${size}`,
-        stock: p.id.charCodeAt(0) % 15 || 5, // mock threshold formula
+        // Use product id + size as the unique key to avoid collisions
+        key: `${p.id}-${size}`,
+        sku: `${p.name.slice(0, 3).toUpperCase()}-${(p.color ?? 'NA').slice(0, 2).toUpperCase()}-${size}`,
+        name: `${p.name} · ${p.color ?? ''} · ${size}`,
+        stock: p.stock_quantity ?? (p.id.charCodeAt(0) % 15 || 5),
         threshold: 5,
       });
     });
@@ -552,9 +560,9 @@ function StockTab({ products }: { products: any[] }) {
               {stockItems.map((s) => {
                 const status = s.stock === 0 ? 'Out' : s.stock < s.threshold ? 'Low' : 'Healthy';
                 return (
-                  <tr key={s.sku} className="hover:bg-background-cream/15 transition-colors">
+                  <tr key={s.key} className="hover:bg-background-cream/15 transition-colors">
                     <td className="p-4 font-mono text-xs">{s.sku}</td>
-                    <td className="p-4 font-serif text-base" dangerouslySetInnerHTML={{ __html: s.name }} />
+                    <td className="p-4 font-serif text-base">{s.name}</td>
                     <td className="p-4 text-xs">
                       <span className={`px-2 py-0.5 border ${
                         status === 'Healthy'
@@ -682,7 +690,7 @@ function MeasurementsTab() {
   }, []);
 
   const fetchMeasurements = async () => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_admin_token');
     if (!token) return;
 
     setLoadingMeasurements(true);
@@ -694,8 +702,9 @@ function MeasurementsTab() {
       if (!response.ok) throw new Error('Failed to load measurements');
 
       const data = await response.json();
-      const tops = data.filter((m: any) => m.fitType === 'top');
-      const bottoms = data.filter((m: any) => m.fitType === 'bottom');
+      // Server returns snake_case fit_type
+      const tops = data.filter((m: any) => m.fit_type === 'top' || m.fitType === 'top');
+      const bottoms = data.filter((m: any) => m.fit_type === 'bottom' || m.fitType === 'bottom');
 
       setTopMeasurements(tops);
       setBottomMeasurements(bottoms);
@@ -713,7 +722,7 @@ function MeasurementsTab() {
       return;
     }
 
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_admin_token');
     if (!token) return;
 
     try {
@@ -752,7 +761,7 @@ function MeasurementsTab() {
   };
 
   const deleteMeasurement = async (id: string, fitType: 'top' | 'bottom') => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_admin_token');
     if (!token) return;
 
     try {
@@ -777,7 +786,7 @@ function MeasurementsTab() {
   };
 
   const updateMeasurement = async (id: string, fitType: 'top' | 'bottom', newName: string) => {
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_admin_token');
     if (!token) return;
 
     try {

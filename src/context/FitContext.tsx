@@ -34,7 +34,7 @@ export function FitProvider({ children }: { children: React.ReactNode }) {
 
   const saveFitProfile = async (profile: FitProfileData) => {
     setLoading(true);
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_user_token');
     const userId = localStorage.getItem('grazel_user_id');
 
     try {
@@ -71,7 +71,7 @@ export function FitProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserFitProfile = async () => {
     setLoading(true);
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_user_token');
 
     try {
       if (!token) {

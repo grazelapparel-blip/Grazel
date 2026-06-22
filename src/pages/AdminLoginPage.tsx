@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Mail, Lock, Shield, Sparkles } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 export function AdminLoginPage() {
-  const { signIn, signOut } = useAuth();
+  const { adminSignIn, adminSignOut } = useAdminAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,14 +24,8 @@ export function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const success = await signIn(email, password);
+      const success = await adminSignIn(email, password);
       if (success) {
-        if (email !== 'admin@grazel.com') {
-          await signOut();
-          toast.error('Access denied. Please use an administrator account.');
-          return;
-        }
-
         toast.success('Admin login successful!');
         navigate('/admin', { replace: true });
       } else {

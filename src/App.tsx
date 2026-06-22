@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CartProvider } from "@/context/CartContext";
 import { ProductProvider } from "@/context/ProductContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { AdminAuthProvider } from "@/context/AdminAuthContext";
 import { FitProvider } from "@/context/FitContext";
 import Index from "./pages/Index";
 import { CategoryPage } from "./pages/CategoryPage";
@@ -65,21 +66,23 @@ function AnimatedRoutes() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <FitProvider>
-        <ProductProvider>
-          <CartProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                <AnimatedRoutes />
-              </BrowserRouter>
-            </TooltipProvider>
-          </CartProvider>
-        </ProductProvider>
-      </FitProvider>
-    </AuthProvider>
+    <AdminAuthProvider>
+      <AuthProvider>
+        <FitProvider>
+          <ProductProvider>
+            <CartProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                  <AnimatedRoutes />
+                </BrowserRouter>
+              </TooltipProvider>
+            </CartProvider>
+          </ProductProvider>
+        </FitProvider>
+      </AuthProvider>
+    </AdminAuthProvider>
   </QueryClientProvider>
 );
 

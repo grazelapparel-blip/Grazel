@@ -46,7 +46,7 @@ export function CheckoutPage() {
 
     setSubmitting(true);
     const fullAddress = `${address}, ${city}, ${state} - ${zip}`;
-    const token = localStorage.getItem('grazel_token');
+    const token = localStorage.getItem('grazel_user_token');
 
     try {
       const response = await fetch('/api/orders', {

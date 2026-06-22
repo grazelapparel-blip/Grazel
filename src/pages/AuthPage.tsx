@@ -32,17 +32,15 @@ export function AuthPage() {
       if (isLogin) {
         const success = await signIn(email, password);
         if (success) {
-          toast.success('Successfully logged in!');
-          navigate('/', { replace: true });
+          toast.success('Welcome back!');
+          const from = (location.state as any)?.from?.pathname || '/';
+          navigate(from, { replace: true });
         }
       } else {
         const success = await signUp(name, email, password, 'user');
         if (success) {
-          toast.success('Registration successful. Please sign in to continue.');
-          setIsLogin(true);
-          setName('');
-          setPassword('');
-          navigate('/auth', { replace: true, state: location.state });
+          toast.success('Welcome to Grazel! Your account has been created.');
+          navigate('/', { replace: true });
         }
       }
     } catch (err: any) {

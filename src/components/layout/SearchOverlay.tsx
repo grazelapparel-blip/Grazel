@@ -108,7 +108,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               </div>
 
               {/* Search Results or Suggestions */}
-              <div className="grid grid-cols-3 gap-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-12">
                 {/* Popular Searches */}
                 <div>
                   <div className="flex items-center gap-2 text-muted-foreground mb-4">

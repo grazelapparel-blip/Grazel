@@ -19,20 +19,39 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const mapBackendProduct = (p: any): Product => ({
-    ...p,
-    isNew: p.isNewProduct ?? p.isNew,
-    isBestSeller: p.isBestseller ?? p.isBestSeller,
-    isPreOrder: p.isPreOrder ?? p.is_pre_order ?? false,
-    preOrderMessage: p.preOrderMessage ?? p.pre_order_message,
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: Number(p.price) || 0,
+    originalPrice: Number(p.original_price ?? p.originalPrice ?? p.price) || 0,
+    discount: p.discount ?? 0,
+    category: p.category,
+    subcategory: p.subcategory ?? '',
+    fabric: p.fabric ?? '',
+    fit: p.fit ?? 'Regular',
+    fitType: (p.fit_type ?? p.fitType ?? 'none') as 'top' | 'bottom' | 'none',
+    sizes: p.sizes ?? [],
+    images: p.images ?? [],
+    isNew: p.is_new_product ?? p.isNewProduct ?? p.isNew ?? false,
+    isBestSeller: p.is_bestseller ?? p.isBestseller ?? p.isBestSeller ?? false,
+    isPreOrder: p.is_pre_order ?? p.isPreOrder ?? false,
+    preOrderMessage: p.pre_order_message ?? p.preOrderMessage,
+    careInstructions: p.care_instructions ?? p.careInstructions ?? [],
+    composition: p.composition ?? '',
+    deliveryReturns: p.delivery_returns ?? p.deliveryReturns ?? '',
+    returnWindowDays: p.return_window_days ?? p.returnWindowDays ?? 30,
+    tailoredFitMeasurements: p.tailored_fit_measurements ?? p.tailoredFitMeasurements ?? [],
   });
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/products');
+      const response = await fetch('/api/products?page=1&limit=100');
       if (response.ok) {
         const data = await response.json();
-        const mapped = data.map(mapBackendProduct);
+        // Handle both paginated and non-paginated responses for compatibility
+        const productsList = data.products || data;
+        const mapped = (Array.isArray(productsList) ? productsList : []).map(mapBackendProduct);
         setProducts(mapped);
       } else {
         console.warn('API error fetching products, using fallback');
@@ -65,7 +84,8 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addProduct = async (product: Product) => {
-    const token = localStorage.getItem('grazel_token');
+    // Check for admin token first (for admin operations), then user token
+    const token = localStorage.getItem('grazel_admin_token') || localStorage.getItem('grazel_user_token');
     
     // Map compatible isNew flag to model isNewProduct
     const { id, is_new, is_bestseller, ...rest } = product as any;
@@ -96,7 +116,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
 
       const newProduct = await response.json();
       setProducts((prev) => [mapBackendProduct(newProduct), ...prev]);
-      toast.success('Product successfully added to MongoDB catalog!');
+      toast.success('Product added to catalog!');
     } catch (err: any) {
       console.error('Error adding product to backend:', err);
       toast.error(`Failed to add product: ${err.message}`);
@@ -109,7 +129,8 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProduct = async (product: Product) => {
-    const token = localStorage.getItem('grazel_token');
+    // Check for admin token first (for admin operations), then user token
+    const token = localStorage.getItem('grazel_admin_token') || localStorage.getItem('grazel_user_token');
     const { id, is_new, is_bestseller, ...rest } = product as any;
     const bodyPayload = {
       ...rest,
@@ -138,7 +159,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
 
       const updated = await response.json();
       setProducts((prev) => prev.map((p) => (p.id === product.id ? mapBackendProduct(updated) : p)));
-      toast.success('Product successfully updated in MongoDB catalog!');
+      toast.success('Product updated successfully!');
     } catch (err: any) {
       console.error('Error updating product on backend:', err);
       toast.error(`Failed to update product: ${err.message}`);
@@ -151,7 +172,8 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteProduct = async (id: string) => {
-    const token = localStorage.getItem('grazel_token');
+    // Check for admin token first (for admin operations), then user token
+    const token = localStorage.getItem('grazel_admin_token') || localStorage.getItem('grazel_user_token');
 
     try {
       const response = await fetch(`/api/products/${id}`, {
@@ -167,7 +189,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
       }
 
       setProducts((prev) => prev.filter((p) => p.id !== id));
-      toast.success('Product successfully deleted from MongoDB catalog!');
+      toast.success('Product deleted successfully!');
     } catch (err: any) {
       console.error('Error deleting product from backend:', err);
       toast.error(`Failed to delete product: ${err.message}`);
