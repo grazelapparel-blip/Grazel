@@ -165,22 +165,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// Ensure Supabase init completes before any route runs (required on Vercel serverless)
-const serverReady = (async () => {
-  console.log('[STARTUP] In-memory admin credentials:');
-  console.log(`   Email: admin@grazel.com`);
-  console.log(`   Password: admin123`);
-  console.log(`   Hash stored: ${DEFAULT_ADMIN_HASH.substring(0, 20)}...`);
-  await initSupabase();
-})();
+// ─── Server Initialization (works for both local and serverless) ────────────────
+let initPromise = null;
+let initComplete = false;
 
+async function ensureInitialized() {
+  if (initComplete) return;
+  if (!initPromise) {
+    initPromise = (async () => {
+      try {
+        console.log('[STARTUP] In-memory admin credentials:');
+        console.log(`   Email: admin@grazel.com`);
+        console.log(`   Password: admin123`);
+        console.log(`   Hash stored: ${DEFAULT_ADMIN_HASH.substring(0, 20)}...`);
+        await initSupabase();
+        initComplete = true;
+        console.log('[STARTUP] Server initialization complete');
+      } catch (err) {
+        console.error('[STARTUP] Initialization error:', err);
+        throw err;
+      }
+    })();
+  }
+  return initPromise;
+}
+
+// Middleware to ensure initialization before processing requests
 app.use(async (req, res, next) => {
   try {
-    await serverReady;
+    await ensureInitialized();
     next();
   } catch (err) {
-    console.error('Server init failed:', err);
-    res.status(500).json({ message: 'Server initialization failed' });
+    console.error('Server initialization failed:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Server initialization failed', error: err.message });
+    }
   }
 });
 
@@ -1205,14 +1224,17 @@ app.use((req, res) => {
   res.status(404).json({ error: `Route not found: ${req.method} ${req.path}` });
 });
 
-// ─── Start (local dev only — Vercel uses api/index.js) ───────────────────────
+// ─── Start (local dev only — Vercel uses api/[...path].js) ────────────────────
 if (!process.env.VERCEL) {
-  serverReady.then(() => {
+  ensureInitialized().then(() => {
     app.listen(PORT, () => {
       console.log(`\n🚀 Grazel API Server running at http://localhost:${PORT}`);
       console.log(`   Storage: ${supabase ? 'Supabase (PostgreSQL)' : 'In-memory (fallback)'}`);
       console.log(`   Admin credentials: admin@grazel.com / admin123\n`);
     });
+  }).catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
   });
 }
 

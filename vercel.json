@@ -4,24 +4,18 @@
   "devCommand": "npm run dev",
   "functions": {
     "api/**/*.js": {
+      "runtime": "nodejs20.x",
       "includeFiles": "server/**"
     }
   },
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
       "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Cross-Origin-Opener-Policy",
-          "value": "cross-origin"
-        }
-      ]
+      "destination": "/api/[...path]"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

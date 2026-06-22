@@ -1,26 +1,29 @@
 import app from '../server/server.js';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   try {
-    // Vercel routes /api/* to this catch-all handler
-    // We need to ensure req.url has the /api prefix for Express routing
-    
+    // For serverless, we need to ensure the request is properly routed
+    // Vercel passes the full URL path including /api prefix
     let url = req.url || '';
     
-    // Handle case where Vercel passes path without /api prefix
-    if (url && !url.startsWith('/api')) {
+    // Normalize URL for Express
+    if (!url.startsWith('/api')) {
       url = `/api${url.startsWith('/') ? url : '/' + url}`;
     }
     
-    // Set the normalized URL
     req.url = url;
     
-    console.log(`[API Catch-All] ${req.method} ${req.url}`);
+    console.log(`[Vercel Handler] ${req.method} ${req.url}`);
     
-    // Invoke the Express app
+    // Invoke Express app
     app(req, res);
   } catch (err) {
-    console.error('[API Catch-All Error]', err);
-    res.status(500).json({ error: 'Internal server error', message: err.message });
+    console.error('[Handler Error]', err);
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Internal server error', 
+        message: err.message 
+      });
+    }
   }
 }
