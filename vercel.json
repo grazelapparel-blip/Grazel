@@ -15,11 +15,20 @@
   ],
   "headers": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api).*)$",
       "headers": [
         {
           "key": "Cross-Origin-Opener-Policy",
           "value": "same-origin-allow-popups"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "cross-origin"
         }
       ]
     }
