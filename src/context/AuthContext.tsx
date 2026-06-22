@@ -135,10 +135,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(googleUser),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: { message?: string; token?: string; user?: UserType } = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error('Invalid response from authentication server');
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Google authentication failed');
+        throw new Error(data.message || `Google authentication failed (${response.status})`);
       }
 
       localStorage.setItem('grazel_user_token', data.token);

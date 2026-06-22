@@ -139,12 +139,15 @@ const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:3001',
   process.env.FRONTEND_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. curl, Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (e.g. curl, Postman, same-origin)
+    const isVercelPreview = origin && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+    if (!origin || allowedOrigins.includes(origin) || isVercelPreview) {
       callback(null, true);
     } else {
       callback(new Error(`CORS policy: origin ${origin} not allowed`));
@@ -160,6 +163,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
+});
+
+// Ensure Supabase init completes before any route runs (required on Vercel serverless)
+const serverReady = (async () => {
+  console.log('[STARTUP] In-memory admin credentials:');
+  console.log(`   Email: admin@grazel.com`);
+  console.log(`   Password: admin123`);
+  console.log(`   Hash stored: ${DEFAULT_ADMIN_HASH.substring(0, 20)}...`);
+  await initSupabase();
+})();
+
+app.use(async (req, res, next) => {
+  try {
+    await serverReady;
+    next();
+  } catch (err) {
+    console.error('Server init failed:', err);
+    res.status(500).json({ message: 'Server initialization failed' });
+  }
 });
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
@@ -630,6 +652,30 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // GOOGLE AUTH
+// Handle the OAuth redirect callback (GET) from Google's popup flow.
+// After the user authenticates in the popup, Google redirects here.
+// We serve a minimal HTML page that sends the id_token to the opener
+// via postMessage, then closes the popup.
+app.get('/api/auth/google', (req, res) => {
+  res.set('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html>
+<html><head><title>Signing in...</title></head>
+<body><script>
+(function(){
+  try {
+    var hash = window.location.hash.substring(1);
+    var params = new URLSearchParams(hash);
+    var idToken = params.get('id_token');
+    if (idToken && window.opener) {
+      window.opener.postMessage({ type: 'google-credential', credential: idToken }, '*');
+    }
+  } catch(e) {}
+  try { window.close(); } catch(e) {}
+  document.body.innerText = 'Authentication successful. You may close this window.';
+})();
+<\/script></body></html>`);
+});
+
 app.post('/api/auth/google', async (req, res) => {
   try {
     const { googleId, email, name = 'User', avatar } = req.body;
@@ -1159,21 +1205,15 @@ app.use((req, res) => {
   res.status(404).json({ error: `Route not found: ${req.method} ${req.path}` });
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
-// Check Supabase tables BEFORE binding the port so all routes see the correct
-// storage mode from the very first request.
-(async () => {
-  console.log('[STARTUP] In-memory admin credentials:');
-  console.log(`   Email: admin@grazel.com`);
-  console.log(`   Password: admin123`);
-  console.log(`   Hash stored: ${DEFAULT_ADMIN_HASH.substring(0, 20)}...`);
-  
-  await initSupabase();
-
-  app.listen(PORT, () => {
-    console.log(`\n🚀 Grazel API Server running at http://localhost:${PORT}`);
-    console.log(`   Storage: ${supabase ? 'Supabase (PostgreSQL)' : 'In-memory (fallback)'}`);
-    console.log(`   Admin credentials: admin@grazel.com / admin123\n`);
+// ─── Start (local dev only — Vercel uses api/index.js) ───────────────────────
+if (!process.env.VERCEL) {
+  serverReady.then(() => {
+    app.listen(PORT, () => {
+      console.log(`\n🚀 Grazel API Server running at http://localhost:${PORT}`);
+      console.log(`   Storage: ${supabase ? 'Supabase (PostgreSQL)' : 'In-memory (fallback)'}`);
+      console.log(`   Admin credentials: admin@grazel.com / admin123\n`);
+    });
   });
-})();
+}
 
+export default app;
