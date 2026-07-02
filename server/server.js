@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import apiRoutes from './routes/api.js';
 
 dotenv.config();
 
@@ -1214,7 +1215,135 @@ app.delete('/api/measurements/:id', verifyToken, requireAdmin, async (req, res) 
   }
 });
 
+// ─── BUNDLES (with in-memory fallback) ──────────────────────────────────────
+
+const mockBundles = [];
+
+app.get('/api/bundles', async (req, res) => {
+  try {
+    if (supabase) {
+      let query = supabase.from('bundles').select('*').eq('is_active', true);
+      if (req.query.type) query = query.eq('bundle_type', req.query.type);
+      if (req.query.seasonal) query = query.eq('seasonal_category', req.query.seasonal);
+      if (req.query.featured === 'true') query = query.eq('is_featured', true);
+      const { data, error } = await query.order('display_order');
+      if (!error && data) return res.json({ success: true, bundles: data });
+    }
+    res.json({ success: true, bundles: mockBundles.filter(b => b.is_active !== false) });
+  } catch (err) {
+    console.error('GET /api/bundles error:', err);
+    res.json({ success: true, bundles: [] });
+  }
+});
+
+app.post('/api/bundles', (req, res) => {
+  const bundle = { id: `bundle_${Date.now()}`, ...req.body, is_active: true, created_at: new Date().toISOString() };
+  mockBundles.push(bundle);
+  res.status(201).json({ success: true, bundle });
+});
+
+app.delete('/api/bundles/:id', (req, res) => {
+  const idx = mockBundles.findIndex(b => b.id === req.params.id);
+  if (idx !== -1) mockBundles.splice(idx, 1);
+  res.json({ success: true });
+});
+
+// ─── DISCOUNTS (with in-memory fallback) ────────────────────────────────────
+
+const mockDiscounts = [];
+
+app.get('/api/discounts', async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('discounts').select('*').order('created_at', { ascending: false });
+      if (!error && data) return res.json({ success: true, discounts: data });
+    }
+    res.json({ success: true, discounts: mockDiscounts });
+  } catch (err) {
+    console.error('GET /api/discounts error:', err);
+    res.json({ success: true, discounts: [] });
+  }
+});
+
+app.post('/api/discounts', (req, res) => {
+  const discount = {
+    id: `disc_${Date.now()}`,
+    code: req.body.code?.toUpperCase() || '',
+    description: req.body.description || '',
+    discount_type: req.body.discountType || 'percentage',
+    discount_value: Number(req.body.discountValue) || 0,
+    applies_to: req.body.appliesTo || 'all',
+    product_ids: req.body.productIds || [],
+    category_ids: req.body.categoryIds || [],
+    bundle_ids: req.body.bundleIds || [],
+    max_uses_per_customer: req.body.maxUsesPerCustomer || 0,
+    total_max_uses: req.body.totalMaxUses || 0,
+    current_uses: 0,
+    start_date: req.body.startDate || new Date().toISOString(),
+    end_date: req.body.endDate || new Date(Date.now() + 30*86400000).toISOString(),
+    min_order_amount: Number(req.body.minOrderAmount) || 0,
+    is_stackable: req.body.isStackable || false,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+  mockDiscounts.push(discount);
+  res.status(201).json({ success: true, discount });
+});
+
+app.put('/api/discounts/:id', (req, res) => {
+  const idx = mockDiscounts.findIndex(d => d.id === req.params.id);
+  if (idx !== -1) {
+    mockDiscounts[idx] = { ...mockDiscounts[idx], ...req.body, updated_at: new Date().toISOString() };
+    return res.json({ success: true, discount: mockDiscounts[idx] });
+  }
+  res.status(404).json({ error: 'Discount not found' });
+});
+
+app.delete('/api/discounts/:id', (req, res) => {
+  const idx = mockDiscounts.findIndex(d => d.id === req.params.id);
+  if (idx !== -1) mockDiscounts.splice(idx, 1);
+  res.json({ success: true });
+});
+
+// ─── SEASONAL COLLECTIONS (with in-memory fallback) ─────────────────────────
+
+const mockCollections = [];
+
+app.get('/api/collections', async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('seasonal_collections').select('*').eq('is_active', true).order('display_order');
+      if (!error && data) return res.json({ success: true, collections: data });
+    }
+    res.json({ success: true, collections: mockCollections });
+  } catch (err) {
+    console.error('GET /api/collections error:', err);
+    res.json({ success: true, collections: [] });
+  }
+});
+
+app.post('/api/collections', (req, res) => {
+  const collection = {
+    id: `col_${Date.now()}`,
+    title: req.body.title || '',
+    slug: req.body.slug || '',
+    description: req.body.description || '',
+    season: req.body.season || '',
+    image: req.body.image || '/placeholder.svg',
+    featured_products: req.body.featuredProducts || [],
+    is_active: true,
+    display_order: req.body.displayOrder || 0,
+    created_at: new Date().toISOString(),
+  };
+  mockCollections.push(collection);
+  res.status(201).json({ success: true, collection });
+});
+
 // ─── Error Handling ───────────────────────────────────────────────────────────
+
+// Register comprehensive API routes (payments, shipping, discounts, etc.)
+app.use('/api', apiRoutes);
+
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.stack);
   res.status(500).json({ error: 'Internal server error' });

@@ -4,13 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, TrendingUp, ShoppingCart, Users, Package,
   RotateCcw, BarChart3, Boxes, Truck, FileText,
-  Calendar, MapPin, RefreshCw, Plus, Edit2, Trash2
+  Calendar, MapPin, RefreshCw, Plus, Edit2, Trash2, Tag, Pen
 } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { ProductManager } from '@/components/admin/ProductManager';
+import { DiscountManager } from '@/components/admin/DiscountManager';
+import { ContentManager } from '@/components/admin/ContentManager';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { useProducts } from '@/context/ProductContext';
 import { toast } from 'sonner';
@@ -20,9 +22,11 @@ const tabs = [
   { id: 'users', label: 'Users', icon: Users },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'products', label: 'Products', icon: Package },
+  { id: 'content', label: 'Content', icon: Pen },
   { id: 'measurements', label: 'Measurements', icon: Boxes },
   { id: 'stock', label: 'Stock', icon: Boxes },
   { id: 'returns', label: 'Returns', icon: RotateCcw },
+  { id: 'discounts', label: 'Discounts', icon: Tag },
   { id: 'policy', label: 'Return Policy', icon: FileText },
 ];
 
@@ -251,9 +255,11 @@ export function AdminDashboard() {
             {active === 'users' && <UsersTab users={users} orders={orders} />}
             {active === 'orders' && <OrdersTab orders={orders} onUpdateStatus={handleUpdateStatus} />}
             {active === 'products' && <ProductsTab />}
+            {active === 'content' && <ContentTab />}
             {active === 'measurements' && <MeasurementsTab />}
             {active === 'stock' && <StockTab products={products} />}
             {active === 'returns' && <ReturnsTab />}
+            {active === 'discounts' && <DiscountsTab />}
             {active === 'policy' && <PolicyTab />}
           </motion.div>
         </AnimatePresence>
@@ -526,6 +532,15 @@ function ProductsTab() {
   );
 }
 
+function DiscountsTab() {
+  return (
+    <div>
+      <SectionTitle>Discount Control Center</SectionTitle>
+      <DiscountManager />
+    </div>
+  );
+}
+
 // 5. Stock Inventory
 function StockTab({ products }: { products: any[] }) {
   const stockItems: any[] = [];
@@ -662,7 +677,16 @@ function PolicyTab() {
   );
 }
 
-// 8. Measurements Tab
+// 8. Content Management
+function ContentTab() {
+  return (
+    <div>
+      <ContentManager />
+    </div>
+  );
+}
+
+// 9. Measurements Tab
 function MeasurementsTab() {
   const [topMeasurements, setTopMeasurements] = useState<any[]>([]);
   const [bottomMeasurements, setBottomMeasurements] = useState<any[]>([]);

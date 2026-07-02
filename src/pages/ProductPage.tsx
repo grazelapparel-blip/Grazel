@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Heart, Minus, Plus, ChevronDown, ChevronRight, Ruler, Sparkles, Star } from 'lucide-react';
+import { Heart, Minus, Plus, ChevronDown, ChevronRight, Ruler, Sparkles, Star, ShieldCheck, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,25 @@ type ProductReview = {
   createdAt?: string;
 };
 
+const sizeGuideData = [
+  { size: 'XS', chest: '86-91', waist: '71-76', hip: '86-91', shoulder: '38-40' },
+  { size: 'S', chest: '91-96', waist: '76-81', hip: '91-96', shoulder: '40-42' },
+  { size: 'M', chest: '96-101', waist: '81-86', hip: '96-101', shoulder: '42-44' },
+  { size: 'L', chest: '101-106', waist: '86-91', hip: '101-106', shoulder: '44-46' },
+  { size: 'XL', chest: '106-111', waist: '91-96', hip: '106-111', shoulder: '46-48' },
+  { size: 'XXL', chest: '111-116', waist: '96-101', hip: '111-116', shoulder: '48-50' },
+];
+
+function convertToInches(cm: string): string {
+  const parts = cm.split('-');
+  if (parts.length === 2) {
+    const min = Math.round(parseInt(parts[0]) / 2.54);
+    const max = Math.round(parseInt(parts[1]) / 2.54);
+    return `${min}-${max}`;
+  }
+  return cm;
+}
+
 export function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const { addToCart, addToWishlist, removeFromWishlist, isInWishlist } = useCart();
@@ -33,6 +52,7 @@ export function ProductPage() {
   const [showFit, setShowFit] = useState(false);
   const [showTryOn, setShowTryOn] = useState(false);
   const [recommendedSize, setRecommendedSize] = useState<string | null>(null);
+  const [sizeUnit, setSizeUnit] = useState<'cm' | 'inches'>('cm');
   const [reviews, setReviews] = useState<ProductReview[]>([]);
 
   useEffect(() => {
@@ -62,6 +82,20 @@ export function ProductPage() {
     if (reviews.length === 0) return 0;
     return reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
   }, [reviews]);
+
+  // Rating distribution
+  const ratingDistribution = useMemo(() => {
+    const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviews.forEach((r) => {
+      const key = Math.round(r.rating) as keyof typeof dist;
+      if (key >= 1 && key <= 5) dist[key]++;
+    });
+    return dist;
+  }, [reviews]);
+
+  // Check return eligibility (simulated - product is returnable if not customized)
+  const isCustomized = product?.fitType && product.fitType !== 'none';
+  const returnWindowDays = product?.returnWindowDays || 7;
 
   if (!product) {
     return (
@@ -114,7 +148,7 @@ export function ProductPage() {
     <div className="accordion-quiet">
       <button
         onClick={() => toggleSection(id)}
-        className="w-full flex items-center justify-between text-sm font-medium text-foreground"
+        className="w-full flex items-center justify-between text-sm font-medium text-foreground py-4"
       >
         <span>{title}</span>
         <ChevronDown
@@ -132,7 +166,7 @@ export function ProductPage() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pt-4 text-sm text-muted-foreground leading-relaxed">
+            <div className="pb-4 text-sm text-muted-foreground leading-relaxed">
               {children}
             </div>
           </motion.div>
@@ -172,11 +206,20 @@ export function ProductPage() {
           <div className="space-y-4">
             <div className="aspect-[3/4] bg-secondary overflow-hidden">
               <img
-                src={product.images[0]}
+                src={product.images[0] || '/placeholder.svg'}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
             </div>
+            {product.images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {product.images.slice(1, 5).map((img, idx) => (
+                  <div key={idx} className="aspect-[3/4] bg-secondary overflow-hidden">
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Info */}
@@ -191,12 +234,24 @@ export function ProductPage() {
               <h1 className="font-serif text-3xl lg:text-4xl text-foreground">
                 {product.name}
               </h1>
-              <p className="mt-2 text-lg text-foreground">₹{product.price}</p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-lg text-foreground font-medium">₹{product.price}</span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <>
+                    <span className="text-sm text-muted-foreground line-through">
+                      ₹{product.originalPrice}
+                    </span>
+                    <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-0.5">
+                      {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                    </span>
+                  </>
+                )}
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {product.fabric} · {product.fit} Fit
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 text-primary">
+                <div className="flex items-center gap-1 text-amber-500">
                   {[1, 2, 3, 4, 5].map((value) => (
                     <Star
                       key={value}
@@ -228,10 +283,10 @@ export function ProductPage() {
                 </span>
                 <button
                   onClick={() => setShowSizeGuide(true)}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                 >
                   <Ruler className="h-4 w-4" />
-                  <span>Size Guide</span>
+                  <span>View Size Guide</span>
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -255,25 +310,35 @@ export function ProductPage() {
                 </p>
               )}
               {recommendedSize && (
-                <p className="mt-2 text-xs text-primary">
-                  Fit Intelligence recommends size {recommendedSize}
+                <p className="mt-2 text-xs text-primary font-medium">
+                  ✦ Curate My Fit recommends size {recommendedSize}
                 </p>
               )}
 
-              {/* Fit Intelligence + Try-On row */}
+              {/* Curate My Fit + Try-On row */}
+              <div className="mt-4 rounded-none border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Curate My Fit</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Get a tailored size recommendation using your preferred measurements.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowFit(true)}
+                    className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-none border border-primary bg-primary px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    <Sparkles className="h-4 w-4" /> Curate My Fit
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3 mt-4">
-                <button
-                  onClick={() => setShowFit(true)}
-                  className="flex items-center justify-center gap-2 py-3 border border-border hover:border-primary hover:text-primary text-xs uppercase tracking-[0.15em] transition-colors"
-                >
-                  <Ruler className="h-3.5 w-3.5" /> Find My Size
-                </button>
-                {/*<button
-                  onClick={() => setShowTryOn(true)}
-                  className="flex items-center justify-center gap-2 py-3 border border-border hover:border-primary hover:text-primary text-xs uppercase tracking-[0.15em] transition-colors"
-                >
-                  <Sparkles className="h-3.5 w-3.5" /> Virtual Try-On
-                </button> */}
+                {false && (
+                  <button
+                    onClick={() => setShowTryOn(true)}
+                    className="flex items-center justify-center gap-2 py-3.5 border border-border hover:border-primary hover:text-primary text-xs uppercase tracking-[0.15em] transition-colors"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> Virtual Try-On
+                  </button>
+                )}
               </div>
             </div>
 
@@ -319,8 +384,25 @@ export function ProductPage() {
               </Button>
             </div>
 
+            {/* Return Policy Banner */}
+            <div className={`border p-4 text-sm ${isCustomized ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
+              <div className="flex items-start gap-2">
+                <ShieldCheck className={`h-5 w-5 flex-shrink-0 mt-0.5 ${isCustomized ? 'text-amber-600' : 'text-green-600'}`} />
+                <div>
+                  <p className={`font-medium ${isCustomized ? 'text-amber-800' : 'text-green-800'}`}>
+                    {isCustomized ? 'Customized Product — No Returns' : `${returnWindowDays}-Day Return Available`}
+                  </p>
+                  <p className={`text-xs mt-1 ${isCustomized ? 'text-amber-700' : 'text-green-700'}`}>
+                    {isCustomized
+                      ? 'This product is made to your specifications and cannot be returned or exchanged.'
+                      : `You can return this product within ${returnWindowDays} days of delivery. Items must be unworn with tags attached.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Accordions */}
-            <div>
+            <div className="divide-y divide-border">
               <AccordionSection id="description" title="Description">
                 {product.description || "No description available"}
               </AccordionSection>
@@ -355,12 +437,14 @@ export function ProductPage() {
                       </p>
                     )}
                     <p className="mb-2">
-                      Standard delivery: 3-5 business days (Free on orders over ₹200)
+                      Standard delivery: 3-5 business days
                     </p>
-                    <p className="mb-2">Express delivery: 1-2 business days (₹15)</p>
+                    <p className="mb-2">Express delivery: 1-2 business days</p>
                     <p>
-                      Returns are accepted within 30 days of delivery. Items must be
-                      unworn with tags attached.
+                      {isCustomized
+                        ? 'Customized products cannot be returned.'
+                        : `Returns are accepted within ${returnWindowDays} days of delivery. Items must be unworn with tags attached.`
+                      }
                     </p>
                   </>
                 )}
@@ -368,29 +452,52 @@ export function ProductPage() {
 
               <AccordionSection id="reviews" title={`Ratings & Reviews (${reviews.length})`}>
                 {reviews.length > 0 ? (
-                  <div className="space-y-5">
-                    <div className="flex items-center gap-3 text-foreground">
-                      <span className="font-serif text-3xl">{averageRating.toFixed(1)}</span>
-                      <div>
-                        <div className="flex items-center gap-1 text-primary">
+                  <div className="space-y-6">
+                    {/* Rating Summary */}
+                    <div className="flex items-start gap-6">
+                      <div className="text-center">
+                        <span className="font-serif text-4xl text-foreground">{averageRating.toFixed(1)}</span>
+                        <div className="flex items-center gap-0.5 mt-1 text-amber-500 justify-center">
                           {[1, 2, 3, 4, 5].map((value) => (
                             <Star
                               key={value}
-                              className={`h-4 w-4 ${averageRating >= value - 0.25 ? 'fill-current' : ''}`}
+                              className={`h-3.5 w-3.5 ${averageRating >= value - 0.25 ? 'fill-current' : ''}`}
                             />
                           ))}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Based on {reviews.length} verified purchase review{reviews.length > 1 ? 's' : ''}
+                          {reviews.length} review{reviews.length > 1 ? 's' : ''}
                         </p>
+                      </div>
+                      {/* Rating Breakdown */}
+                      <div className="flex-1 space-y-1.5">
+                        {([5, 4, 3, 2, 1] as const).map((star) => {
+                          const count = ratingDistribution[star];
+                          const total = reviews.length;
+                          const pct = total > 0 ? (count / total) * 100 : 0;
+                          return (
+                            <div key={star} className="flex items-center gap-2 text-xs">
+                              <span className="w-4 text-muted-foreground">{star}</span>
+                              <Star className="h-3 w-3 text-amber-500 fill-current" />
+                              <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="w-8 text-right text-muted-foreground">{count}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    <div className="space-y-4">
+                    {/* Review List */}
+                    <div className="space-y-5">
                       {reviews.map((review) => (
-                        <article key={review.id} className="border-t border-border-light pt-4">
+                        <article key={review.id} className="border-t border-border-light pt-5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-1 text-primary">
+                            <div className="flex items-center gap-1 text-amber-500">
                               {[1, 2, 3, 4, 5].map((value) => (
                                 <Star
                                   key={value}
@@ -398,14 +505,14 @@ export function ProductPage() {
                                 />
                               ))}
                             </div>
-                            <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                            <span className="text-[11px] uppercase tracking-[0.12em] text-green-700 bg-green-50 px-2 py-0.5 border border-green-200">
                               Verified purchase
                             </span>
                           </div>
                           {review.title && (
                             <h3 className="mt-2 text-sm font-medium text-foreground">{review.title}</h3>
                           )}
-                          {review.comment && <p className="mt-2">{review.comment}</p>}
+                          {review.comment && <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>}
                           <p className="mt-2 text-xs text-muted-foreground">
                             {review.customerName}
                             {review.createdAt ? ` · ${new Date(review.createdAt).toLocaleDateString()}` : ''}
@@ -415,7 +522,11 @@ export function ProductPage() {
                     </div>
                   </div>
                 ) : (
-                  <p>Ratings and reviews will appear here after customers purchase and review this product.</p>
+                  <div className="text-center py-6">
+                    <Star className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-40" />
+                    <p className="text-sm text-muted-foreground">No reviews yet.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Be the first to review this product after purchase.</p>
+                  </div>
                 )}
               </AccordionSection>
             </div>
@@ -432,7 +543,7 @@ export function ProductPage() {
         />
       )}
 
-      {/* Size Guide Modal */}
+      {/* Enhanced Size Guide Modal */}
       <AnimatePresence>
         {showSizeGuide && (
           <>
@@ -447,33 +558,96 @@ export function ProductPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-card p-8 z-50 shadow-mega"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-card p-8 z-50 shadow-mega max-h-[90vh] overflow-y-auto"
             >
-              <h2 className="font-serif text-xl mb-6">Size Guide</h2>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="py-2 text-left font-medium">Size</th>
-                    <th className="py-2 text-left font-medium">Chest (cm)</th>
-                    <th className="py-2 text-left font-medium">Waist (cm)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { size: 'XS', chest: '86-91', waist: '71-76' },
-                    { size: 'S', chest: '91-96', waist: '76-81' },
-                    { size: 'M', chest: '96-101', waist: '81-86' },
-                    { size: 'L', chest: '101-106', waist: '86-91' },
-                    { size: 'XL', chest: '106-111', waist: '91-96' },
-                  ].map((row) => (
-                    <tr key={row.size} className="border-b border-border-light">
-                      <td className="py-3">{row.size}</td>
-                      <td className="py-3">{row.chest}</td>
-                      <td className="py-3">{row.waist}</td>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-serif text-xl">Size Guide — {product.name}</h2>
+                <button onClick={() => setShowSizeGuide(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Unit Toggle */}
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Unit:</span>
+                <button
+                  onClick={() => setSizeUnit('cm')}
+                  className={`px-4 py-2 text-xs border transition-colors ${
+                    sizeUnit === 'cm' ? 'border-primary text-primary bg-primary/5' : 'border-border hover:border-primary'
+                  }`}
+                >
+                  CM
+                </button>
+                <button
+                  onClick={() => setSizeUnit('inches')}
+                  className={`px-4 py-2 text-xs border transition-colors ${
+                    sizeUnit === 'inches' ? 'border-primary text-primary bg-primary/5' : 'border-border hover:border-primary'
+                  }`}
+                >
+                  Inches
+                </button>
+              </div>
+
+              {/* Measurement Chart */}
+              <div className="overflow-x-auto mb-6">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border">
+                      <th className="py-3 text-left font-medium text-foreground">Size</th>
+                      <th className="py-3 text-left font-medium text-foreground">Chest</th>
+                      <th className="py-3 text-left font-medium text-foreground">Waist</th>
+                      <th className="py-3 text-left font-medium text-foreground">Hip</th>
+                      <th className="py-3 text-left font-medium text-foreground">Shoulder</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {sizeGuideData.map((row) => {
+                      const chest = sizeUnit === 'inches' ? convertToInches(row.chest) : row.chest;
+                      const waist = sizeUnit === 'inches' ? convertToInches(row.waist) : row.waist;
+                      const hip = sizeUnit === 'inches' ? convertToInches(row.hip) : row.hip;
+                      const shoulder = sizeUnit === 'inches' ? convertToInches(row.shoulder) : row.shoulder;
+                      const unit = sizeUnit === 'inches' ? 'in' : 'cm';
+                      return (
+                        <tr key={row.size} className="border-b border-border-light hover:bg-background-cream/50">
+                          <td className="py-3 font-medium">{row.size}</td>
+                          <td className="py-3">{chest} {unit}</td>
+                          <td className="py-3">{waist} {unit}</td>
+                          <td className="py-3">{hip} {unit}</td>
+                          <td className="py-3">{shoulder} {unit}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Measurement Guide Illustration */}
+              <div className="bg-background-cream border border-border p-5">
+                <h3 className="text-xs uppercase tracking-[0.15em] text-foreground font-medium mb-4">How to Measure</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-muted-foreground">
+                  <div className="sm:col-span-2 rounded-none border border-border bg-card/70 p-3">
+                    <p className="font-medium text-foreground mb-1">Measurement guide</p>
+                    <p>Measure in a relaxed standing position, keeping the tape level and snug without pulling tight.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-1">Chest</p>
+                    <p>Measure around the fullest part of your chest, keeping the tape level under your arms.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-1">Waist</p>
+                    <p>Measure around your natural waistline, typically just above your belly button.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-1">Hip</p>
+                    <p>Measure around the fullest part of your hips, about 20cm below your waist.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-1">Shoulder</p>
+                    <p>Measure across your back from the edge of one shoulder to the other.</p>
+                  </div>
+                </div>
+              </div>
+
               <Button
                 variant="outline"
                 className="mt-6 w-full"

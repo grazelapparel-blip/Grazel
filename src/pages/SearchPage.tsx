@@ -7,8 +7,11 @@ import { PageTransition } from '@/components/layout/PageTransition';
 import { ProductCard } from '@/components/product/ProductCard';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useProducts } from '@/context/ProductContext';
+import { categories } from '@/data/products';
 
 const popular = ['Cashmere sweater', 'Wool blazer', 'Silk dress', 'Linen trousers', 'Cotton shirt', 'Camel overcoat'];
+
+const genderCategories = ['men', 'women', 'essentials'];
 
 export function SearchPage() {
   const { products } = useProducts();

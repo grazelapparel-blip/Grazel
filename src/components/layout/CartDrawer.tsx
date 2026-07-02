@@ -141,6 +141,29 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             {/* Footer */}
             {cart.length > 0 && (
               <div className="border-t border-border px-6 py-6 space-y-4">
+                {/* Free Shipping Progress */}
+                {(() => {
+                  const FREE_SHIPPING_THRESHOLD = 1500;
+                  const remaining = FREE_SHIPPING_THRESHOLD - cartTotal;
+                  const progress = Math.min((cartTotal / FREE_SHIPPING_THRESHOLD) * 100, 100);
+                  return remaining > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Add <span className="font-semibold text-primary">₹{remaining.toFixed(0)}</span> more to get free shipping
+                      </p>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                      ✓ You qualify for free shipping!
+                    </p>
+                  );
+                })()}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Subtotal</span>
                   <span className="text-lg font-serif">₹{cartTotal}</span>

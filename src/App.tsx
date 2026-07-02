@@ -23,6 +23,13 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { ReviewOrderPage } from "./pages/ReviewOrderPage";
 import { FitProfilePage } from "./pages/FitProfilePage";
 import { EBoutiquePage } from "./pages/EBoutiquePage";
+import { HelpCenterPage } from "./pages/HelpCenterPage";
+import { OrderTrackingPage } from "./pages/OrderTrackingPage";
+import { CookiePolicyPage } from "./pages/CookiePolicyPage";
+import { ContactUsPage } from "./pages/ContactUsPage";
+import { CategoriesPage } from "./pages/CategoriesPage";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
+import { CookieConsentBanner } from "./components/layout/CookieConsentBanner";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +63,22 @@ function AnimatedRoutes() {
           <Route path="/review-order" element={<ReviewOrderPage />} />
           <Route path="/fit-profile" element={<FitProfilePage />} />
           <Route path="/e-boutique" element={<EBoutiquePage />} />
+          <Route path="/help" element={<HelpCenterPage />} />
+          <Route path="/help-center" element={<HelpCenterPage />} />
+          <Route path="/orders" element={<OrderTrackingPage />} />
+          <Route path="/order-tracking" element={<OrderTrackingPage />} />
+          <Route path="/track-order" element={<OrderTrackingPage />} />
+          <Route path="/cookies" element={<CookiePolicyPage />} />
+          <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/contact" element={<ContactUsPage />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/summer-collection" element={<CategoriesPage />} />
+          <Route path="/winter-collection" element={<CategoriesPage />} />
+          <Route path="/monsoon-collection" element={<CategoriesPage />} />
+          <Route path="/autumn-collection" element={<CategoriesPage />} />
+          <Route path="/diwali-collection" element={<CategoriesPage />} />
+          <Route path="/eid-collection" element={<CategoriesPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -76,6 +99,7 @@ const App = () => (
                 <Sonner />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <AnimatedRoutes />
+                  <CookieConsentBanner />
                 </BrowserRouter>
               </TooltipProvider>
             </CartProvider>
