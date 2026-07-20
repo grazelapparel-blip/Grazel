@@ -11,7 +11,7 @@ interface VirtualTryOnProps {
 }
 
 // Advanced Virtual Try-On with Realistic Clothing Replacement
-const processVirtualTryOnWithAI = async (
+const processVirtualTryOn = async (
   userPhotoSrc: string,
   productImageSrc: string
 ): Promise<string> => {
@@ -204,7 +204,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
         setDetectionProgress('Enhancing realism...');
       }, 600);
       
-      processVirtualTryOnWithAI(photo, productImage).then((processed) => {
+      processVirtualTryOn(photo, productImage).then((processed) => {
         setProcessedPhoto(processed);
         
         setTimeout(() => {
@@ -281,7 +281,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div className="flex items-center gap-3">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <h2 className="font-serif text-xl">Virtual Try-On with AI</h2>
+                <h2 className="font-serif text-xl">Virtual Try-On</h2>
               </div>
               <button onClick={close} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close">
                 <X className="h-5 w-5" />
@@ -296,7 +296,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   >
                     <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                      Upload a clear, front-facing photo. Our AI will intelligently blend and fit
+                      Upload a clear, front-facing photo. We will blend and fit
                       <span className="text-foreground"> {productName} </span>
                       to perfectly match your frame.
                     </p>
@@ -322,7 +322,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
                     />
 
                     <div className="mt-6 p-4 bg-background-cream text-sm text-muted-foreground leading-relaxed">
-                      <p className="text-foreground text-sm uppercase tracking-[0.15em] mb-3 font-medium">For best AI results</p>
+                      <p className="text-foreground text-sm uppercase tracking-[0.15em] mb-3 font-medium">For best results</p>
                       <ul className="space-y-2 text-sm">
                         <li>· Stand facing the camera with good lighting</li>
                         <li>· Wear form-fitting clothing to reveal your shape</li>
@@ -378,7 +378,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm uppercase tracking-[0.15em] text-muted-foreground mb-3 font-medium">AI Preview</p>
+                        <p className="text-sm uppercase tracking-[0.15em] text-muted-foreground mb-3 font-medium">Preview</p>
                         <div className="aspect-[3/4] bg-secondary overflow-hidden relative">
                           {status === 'processing' ? (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background-cream">
@@ -389,7 +389,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
                               />
                               <div className="text-center">
                                 <p className="text-xs text-muted-foreground tracking-[0.15em] uppercase" role="status">
-                                  {detectionProgress || 'Running AI processing…'}
+                                  {detectionProgress || 'Processing…'}
                                 </p>
                               </div>
                             </div>
@@ -404,7 +404,7 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
                                 className="w-full h-full object-cover"
                               />
                               <div className="absolute top-3 left-3 px-3 py-2 bg-primary text-primary-foreground text-xs uppercase tracking-[0.15em] font-medium">
-                                AI Fitted
+                                Fitted
                               </div>
                             </>
                           ) : null}
@@ -420,9 +420,9 @@ export function VirtualTryOn({ isOpen, onClose, productImage, productName }: Vir
                         role="status"
                         aria-label="Preview ready"
                       >
-                        <p className="text-foreground mb-1 font-medium">AI-Fitted Preview Complete</p>
+                        <p className="text-foreground mb-1 font-medium">Fitted Preview Complete</p>
                         <p className="text-muted-foreground text-xs leading-relaxed">
-                          Our AI intelligently blended and positioned {productName} on your body using advanced image processing. This shows exactly how it will look on you.
+                          We blended and positioned {productName} on your body using advanced image processing. This shows exactly how it will look on you.
                         </p>
                       </motion.div>
                     )}

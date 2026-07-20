@@ -96,7 +96,7 @@ async function initSupabase() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }]);
-      
+
       if (insertError) {
         console.error('[INIT] Failed to seed admin:', insertError.message);
         supabase = null;
@@ -132,7 +132,7 @@ const mockProducts = [];
 
 // ─── Local UUID helper (used when Supabase is unavailable) ───────────────────
 function gen_random_uuid_text() {
-  return `${Math.random().toString(36).slice(2,10)}-${Date.now().toString(36)}`;
+  return `${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ const requireAdmin = (req, res, next) => {
  */
 async function findUserByEmail(email) {
   const normalizedEmail = email.toLowerCase().trim();
-  
+
   if (supabase) {
     // Explicitly select all columns including password_hash
     const { data, error } = await supabase
@@ -241,14 +241,14 @@ async function findUserByEmail(email) {
       .select('id, email, name, role, password_hash, google_id, avatar, is_active')
       .eq('email', normalizedEmail)
       .maybeSingle();
-    
+
     if (error) {
       console.warn('Supabase findUserByEmail error, using in-memory fallback:', error.message);
       const fallbackUser = mockUsers.get(normalizedEmail);
       console.log(`[findUserByEmail] Checking in-memory store for ${normalizedEmail}:`, fallbackUser ? 'FOUND' : 'NOT FOUND');
       return fallbackUser || null;
     }
-    
+
     // If found in Supabase, ensure password_hash is a string and return it; otherwise fall back to in-memory
     if (data) {
       // Defensive: ensure password_hash is always a string if it exists
@@ -259,10 +259,10 @@ async function findUserByEmail(email) {
       console.log(`[findUserByEmail] Found in Supabase: ${data.email}, has password_hash: ${!!data.password_hash}`);
       return data;
     }
-    
+
     console.log(`[findUserByEmail] Not found in Supabase, checking in-memory for ${normalizedEmail}`);
   }
-  
+
   const fallbackUser = mockUsers.get(normalizedEmail);
   console.log(`[findUserByEmail] In-memory result for ${normalizedEmail}:`, fallbackUser ? 'FOUND' : 'NOT FOUND');
   if (fallbackUser) {
@@ -493,6 +493,53 @@ app.delete('/api/products/:id', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// POST restock — admin adds stock to a product (increments stock_quantity)
+app.post('/api/products/:id/restock', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const qty = Number(req.body.qty);
+    if (!qty || qty <= 0) {
+      return res.status(400).json({ message: 'qty must be a positive number' });
+    }
+
+    if (supabase) {
+      let rpcSucceeded = false;
+      try {
+        const { error: rpcError } = await supabase.rpc('restock_product', {
+          p_product_id: req.params.id,
+          p_qty: qty,
+          p_reason: 'restock',
+          p_admin_id: req.user?.id || null,
+        });
+        if (!rpcError) rpcSucceeded = true;
+      } catch (rpcErr) {
+        console.warn('restock_product RPC unavailable, falling back to direct update:', rpcErr.message);
+      }
+
+      if (!rpcSucceeded) {
+        const { data: existing, error: fetchError } = await supabase.from('products').select('stock_quantity').eq('id', req.params.id).single();
+        if (fetchError) throw fetchError;
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({ stock_quantity: (existing.stock_quantity || 0) + qty, updated_at: new Date().toISOString() })
+          .eq('id', req.params.id);
+        if (updateError) throw updateError;
+      }
+
+      const { data, error } = await supabase.from('products').select('*').eq('id', req.params.id).single();
+      if (error) throw error;
+      return res.json(data);
+    }
+
+    const idx = mockProducts.findIndex((p) => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Product not found' });
+    mockProducts[idx].stock_quantity = (mockProducts[idx].stock_quantity || 0) + qty;
+    res.json(mockProducts[idx]);
+  } catch (err) {
+    console.error('POST /api/products/:id/restock error:', err);
+    res.status(500).json({ message: 'Failed to restock product' });
+  }
+});
+
 // ─── CART ─────────────────────────────────────────────────────────────────────
 app.get('/api/cart', verifyToken, async (req, res) => {
   try {
@@ -646,7 +693,7 @@ app.post('/api/auth/login', async (req, res) => {
     console.log(`[LOGIN] Comparing password (${password.length} chars) against hash (${passwordHashStr.length} chars)`);
     const passwordValid = await bcrypt.compare(password, passwordHashStr);
     console.log(`[LOGIN] Password validation for ${normalizedEmail}:`, passwordValid ? 'VALID' : 'INVALID');
-    
+
     if (!passwordValid) {
       console.warn(`[LOGIN] Invalid password for ${normalizedEmail}`);
       // Debug: also try comparing with the default admin hash directly
@@ -758,7 +805,7 @@ app.get('/api/auth/users', verifyToken, requireAdmin, async (req, res) => {
     if (supabase) {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, name, role, google_id, created_at, updated_at')
+        .select('id, email, name, role, google_id, phone, created_at, updated_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return res.json(data || []);
@@ -908,7 +955,7 @@ app.post('/api/orders', async (req, res) => {
 app.put('/api/orders/:id/status', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['Pending','Confirmed','Processing','Shipped','Delivered','Cancelled','Returned'];
+    const validStatuses = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ message: `status must be one of: ${validStatuses.join(', ')}` });
     }
@@ -969,7 +1016,7 @@ app.post('/api/reviews', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     let userId = null;
     if (token) {
-      try { userId = jwt.verify(token, JWT_SECRET)?.id; } catch {}
+      try { userId = jwt.verify(token, JWT_SECRET)?.id; } catch { }
     }
 
     const reviewId = `rev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -1036,18 +1083,63 @@ app.get('/api/fit-profile/me', verifyToken, async (req, res) => {
   }
 });
 
+// Admin Fit Profiles list for Admin Dashboard & Excel Export
+let mockFitProfiles = [
+  {
+    id: 'fit_100',
+    user_name: 'Thiru',
+    user_email: 'thiru@example.com',
+    type: 'detailed',
+    height: 172,
+    weight: 68,
+    chest: 96,
+    waist: 78,
+    hip: 92,
+    shoulder_width: 42,
+    recommended_size: 'M',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'fit_101',
+    user_name: 'Sophia Laurent',
+    user_email: 'sophia@example.com',
+    type: 'detailed',
+    height: 168,
+    weight: 58,
+    chest: 88,
+    waist: 68,
+    hip: 94,
+    shoulder_width: 39,
+    recommended_size: 'S',
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+  },
+  {
+    id: 'fit_102',
+    user_name: 'Arthur Pendelton',
+    user_email: 'arthur@example.com',
+    type: 'simple',
+    height: 182,
+    weight: 78,
+    chest: 102,
+    waist: 84,
+    recommended_size: 'L',
+    created_at: new Date(Date.now() - 86400000 * 5).toISOString()
+  }
+];
+
 // POST / upsert fit profile
 app.post('/api/fit-profile', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     let userId = req.body.userId || null;
     if (token) {
-      try { userId = jwt.verify(token, JWT_SECRET)?.id || userId; } catch {}
+      try { userId = jwt.verify(token, JWT_SECRET)?.id || userId; } catch { }
     }
 
     const {
       type, height, weight, chest, shoulderWidth, waist, hip,
       bicep, wrist, armLength, garmentLength, recommendedSize,
+      userName, userEmail
     } = req.body;
 
     if (!type || !['simple', 'detailed'].includes(type)) {
@@ -1057,9 +1149,14 @@ app.post('/api/fit-profile', async (req, res) => {
     const profileId = `fit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
 
+    const finalName = userName || (userId ? 'Authenticated Customer' : 'Thiru');
+    const finalEmail = userEmail || (userId ? 'customer@example.com' : 'thiru@example.com');
+
     const payload = {
       id: profileId,
       user_id: userId || null,
+      user_name: finalName,
+      user_email: finalEmail,
       type,
       height: height || null,
       weight: weight || null,
@@ -1106,10 +1203,106 @@ app.post('/api/fit-profile', async (req, res) => {
       return res.json(data);
     }
 
-    res.status(201).json({ ...payload, id: profileId });
+    mockFitProfiles.unshift(payload);
+
+    res.status(201).json(payload);
   } catch (err) {
     console.error('POST /api/fit-profile error:', err);
     res.status(500).json({ message: err.message || 'Failed to save fit profile' });
+  }
+});
+
+app.get('/api/admin/fit-profiles', async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('fit_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const userIds = data.map(fp => fp.user_id).filter(Boolean);
+        let userMap = {};
+        if (userIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('profiles')
+            .select('id, name, email')
+            .in('id', userIds);
+          if (usersData) {
+            usersData.forEach(u => { userMap[u.id] = u; });
+          }
+        }
+        const formatted = data.map(fp => ({
+          ...fp,
+          user_name: userMap[fp.user_id]?.name || fp.user_name || 'Guest / Unregistered',
+          user_email: userMap[fp.user_id]?.email || fp.user_email || 'N/A'
+        }));
+        return res.json(formatted);
+      }
+    }
+    res.json(mockFitProfiles);
+  } catch (err) {
+    console.error('GET /api/admin/fit-profiles error:', err);
+    res.json(mockFitProfiles);
+  }
+});
+
+// PUT / update fit profile (Admin)
+app.put('/api/admin/fit-profiles/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('fit_profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      if (!error && data) {
+        return res.json(data);
+      }
+    }
+
+    const index = mockFitProfiles.findIndex(fp => String(fp.id) === String(id));
+    if (index !== -1) {
+      mockFitProfiles[index] = {
+        ...mockFitProfiles[index],
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+      return res.json(mockFitProfiles[index]);
+    }
+
+    res.status(404).json({ error: 'Fit profile not found' });
+  } catch (err) {
+    console.error('PUT /api/admin/fit-profiles error:', err);
+    res.status(500).json({ error: 'Failed to update fit profile' });
+  }
+});
+
+// DELETE fit profile (Admin)
+app.delete('/api/admin/fit-profiles/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('fit_profiles')
+        .delete()
+        .eq('id', id);
+      if (error) console.warn('Supabase delete fit_profiles warning:', error.message);
+    }
+
+    mockFitProfiles = mockFitProfiles.filter(fp => String(fp.id) !== String(id));
+    res.json({ success: true, message: 'Fit profile deleted successfully' });
+  } catch (err) {
+    console.error('DELETE /api/admin/fit-profiles error:', err);
+    res.status(500).json({ error: 'Failed to delete fit profile' });
   }
 });
 
@@ -1215,6 +1408,246 @@ app.delete('/api/measurements/:id', verifyToken, requireAdmin, async (req, res) 
   }
 });
 
+// ─── SIZE GUIDES (admin-managed, shown only as configured) ─────────────────
+
+// GET size guide rows — public, optionally filtered by productType/unit
+app.get('/api/size-guides', async (req, res) => {
+  try {
+    const { productType, unit } = req.query;
+    if (supabase) {
+      let query = supabase
+        .from('size_guides')
+        .select('*')
+        .eq('is_active', true)
+        .order('size_code', { ascending: true });
+      if (productType) query = query.eq('product_type', productType);
+      if (unit) query = query.eq('unit', unit);
+      const { data, error } = await query;
+      if (error) throw error;
+      return res.json(data || []);
+    }
+    res.json([]);
+  } catch (err) {
+    console.error('GET /api/size-guides error:', err);
+    res.status(500).json({ error: 'Failed to fetch size guides' });
+  }
+});
+
+// GET all size guide rows for admin (includes inactive)
+app.get('/api/size-guides/all', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('size_guides')
+        .select('*')
+        .order('product_type', { ascending: true })
+        .order('size_code', { ascending: true });
+      if (error) throw error;
+      return res.json(data || []);
+    }
+    res.json([]);
+  } catch (err) {
+    console.error('GET /api/size-guides/all error:', err);
+    res.status(500).json({ error: 'Failed to fetch size guides' });
+  }
+});
+
+// POST create size guide row (admin only)
+app.post('/api/size-guides', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { productType, sizeCode, measurements, unit = 'cm', description } = req.body;
+    if (!productType || !sizeCode || !measurements) {
+      return res.status(400).json({ message: 'productType, sizeCode and measurements are required' });
+    }
+
+    const rowId = gen_random_uuid_text();
+    const now = new Date().toISOString();
+    const payload = {
+      id: rowId,
+      product_type: productType,
+      size_code: sizeCode,
+      measurements,
+      unit,
+      description: description || null,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('size_guides')
+        .insert([payload])
+        .select()
+        .single();
+      if (error) {
+        if (error.code === '23505') return res.status(409).json({ message: `Size ${sizeCode} already exists for ${productType} (${unit})` });
+        throw error;
+      }
+      return res.status(201).json(data);
+    }
+    res.status(201).json(payload);
+  } catch (err) {
+    console.error('POST /api/size-guides error:', err);
+    res.status(500).json({ message: err.message || 'Failed to add size guide' });
+  }
+});
+
+// PUT update size guide row (admin only)
+app.put('/api/size-guides/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { sizeCode, measurements, unit, description, is_active } = req.body;
+    if (supabase) {
+      const updates = { updated_at: new Date().toISOString() };
+      if (sizeCode !== undefined) updates.size_code = sizeCode;
+      if (measurements !== undefined) updates.measurements = measurements;
+      if (unit !== undefined) updates.unit = unit;
+      if (description !== undefined) updates.description = description;
+      if (is_active !== undefined) updates.is_active = is_active;
+
+      const { data, error } = await supabase
+        .from('size_guides')
+        .update(updates)
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return res.json(data);
+    }
+    res.json({ id: req.params.id, ...req.body });
+  } catch (err) {
+    console.error('PUT /api/size-guides/:id error:', err);
+    res.status(500).json({ message: 'Failed to update size guide' });
+  }
+});
+
+// DELETE size guide row (admin only)
+app.delete('/api/size-guides/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    if (supabase) {
+      const { error } = await supabase
+        .from('size_guides')
+        .delete()
+        .eq('id', req.params.id);
+      if (error) throw error;
+      return res.json({ message: 'Size guide row deleted' });
+    }
+    res.json({ message: 'Size guide row deleted' });
+  } catch (err) {
+    console.error('DELETE /api/size-guides/:id error:', err);
+    res.status(500).json({ message: 'Failed to delete size guide' });
+  }
+});
+
+// ─── RETURN POLICIES (admin-editable, publicly readable) ───────────────────
+
+const mockReturnPolicies = [
+  { id: 'rp_1', title: 'Return Window', value: '7 days from delivery', sort_order: 1, is_active: true },
+  { id: 'rp_2', title: 'Condition', value: 'Unworn, tags attached, original packaging', sort_order: 2, is_active: true },
+  { id: 'rp_3', title: 'Refund Method', value: 'Original payment method, 5–7 business days', sort_order: 3, is_active: true },
+  { id: 'rp_4', title: 'Exchanges', value: 'Free size exchange within 7 days', sort_order: 4, is_active: true },
+  { id: 'rp_5', title: 'Final Sale', value: 'Marked items, non-returnable', sort_order: 5, is_active: true },
+];
+
+// GET all active return policies — public
+app.get('/api/return-policies', async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('return_policies')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      return res.json(data || []);
+    }
+    res.json(mockReturnPolicies.filter((p) => p.is_active));
+  } catch (err) {
+    console.error('GET /api/return-policies error:', err);
+    res.status(500).json({ error: 'Failed to fetch return policies' });
+  }
+});
+
+// POST create a return policy row (admin only)
+app.post('/api/return-policies', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { title, value, sortOrder = 0 } = req.body;
+    if (!title || !value) {
+      return res.status(400).json({ message: 'title and value are required' });
+    }
+    const rowId = gen_random_uuid_text();
+    const now = new Date().toISOString();
+    const payload = { id: rowId, title, value, sort_order: sortOrder, is_active: true, created_at: now, updated_at: now };
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('return_policies')
+        .insert([payload])
+        .select()
+        .single();
+      if (error) {
+        if (error.code === '23505') return res.status(409).json({ message: `Policy "${title}" already exists` });
+        throw error;
+      }
+      return res.status(201).json(data);
+    }
+    mockReturnPolicies.push(payload);
+    res.status(201).json(payload);
+  } catch (err) {
+    console.error('POST /api/return-policies error:', err);
+    res.status(500).json({ message: err.message || 'Failed to add return policy' });
+  }
+});
+
+// PUT update a return policy row (admin only)
+app.put('/api/return-policies/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { title, value, sortOrder, is_active } = req.body;
+    if (supabase) {
+      const updates = { updated_at: new Date().toISOString() };
+      if (title !== undefined) updates.title = title;
+      if (value !== undefined) updates.value = value;
+      if (sortOrder !== undefined) updates.sort_order = sortOrder;
+      if (is_active !== undefined) updates.is_active = is_active;
+
+      const { data, error } = await supabase
+        .from('return_policies')
+        .update(updates)
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return res.json(data);
+    }
+    const idx = mockReturnPolicies.findIndex((p) => p.id === req.params.id);
+    if (idx !== -1) mockReturnPolicies[idx] = { ...mockReturnPolicies[idx], title, value, sort_order: sortOrder };
+    res.json({ id: req.params.id, ...req.body });
+  } catch (err) {
+    console.error('PUT /api/return-policies/:id error:', err);
+    res.status(500).json({ message: 'Failed to update return policy' });
+  }
+});
+
+// DELETE a return policy row (admin only)
+app.delete('/api/return-policies/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    if (supabase) {
+      const { error } = await supabase
+        .from('return_policies')
+        .delete()
+        .eq('id', req.params.id);
+      if (error) throw error;
+      return res.json({ message: 'Return policy deleted' });
+    }
+    const idx = mockReturnPolicies.findIndex((p) => p.id === req.params.id);
+    if (idx !== -1) mockReturnPolicies.splice(idx, 1);
+    res.json({ message: 'Return policy deleted' });
+  } catch (err) {
+    console.error('DELETE /api/return-policies/:id error:', err);
+    res.status(500).json({ message: 'Failed to delete return policy' });
+  }
+});
+
 // ─── BUNDLES (with in-memory fallback) ──────────────────────────────────────
 
 const mockBundles = [];
@@ -1236,16 +1669,120 @@ app.get('/api/bundles', async (req, res) => {
   }
 });
 
-app.post('/api/bundles', (req, res) => {
-  const bundle = { id: `bundle_${Date.now()}`, ...req.body, is_active: true, created_at: new Date().toISOString() };
-  mockBundles.push(bundle);
-  res.status(201).json({ success: true, bundle });
+app.post('/api/bundles', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      name, description, bundleType, productIds, bundlePrice, originalPrice,
+      images = [], seasonalCategory, isFeatured = false, displayOrder = 0, stockQuantity = 0,
+    } = req.body;
+
+    if (!name || !bundleType || !productIds?.length || !bundlePrice || !originalPrice) {
+      return res.status(400).json({ message: 'name, bundleType, productIds, bundlePrice and originalPrice are required' });
+    }
+
+    const savingsAmount = Number(originalPrice) - Number(bundlePrice);
+    const discountPercentage = originalPrice > 0 ? Math.round((savingsAmount / originalPrice) * 100) : 0;
+    const bundleId = gen_random_uuid_text();
+    const now = new Date().toISOString();
+
+    const payload = {
+      id: bundleId,
+      name,
+      description: description || null,
+      bundle_type: bundleType,
+      product_ids: productIds,
+      bundle_price: Number(bundlePrice),
+      original_price: Number(originalPrice),
+      discount_percentage: discountPercentage,
+      savings_amount: savingsAmount,
+      images,
+      display_order: displayOrder,
+      is_active: true,
+      is_featured: isFeatured,
+      stock_quantity: Number(stockQuantity) || 0,
+      seasonal_category: seasonalCategory || null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('bundles')
+        .insert([payload])
+        .select()
+        .single();
+      if (error) throw error;
+      return res.status(201).json({ success: true, bundle: data });
+    }
+
+    mockBundles.push(payload);
+    res.status(201).json({ success: true, bundle: payload });
+  } catch (err) {
+    console.error('POST /api/bundles error:', err);
+    res.status(500).json({ message: err.message || 'Failed to create bundle' });
+  }
 });
 
-app.delete('/api/bundles/:id', (req, res) => {
-  const idx = mockBundles.findIndex(b => b.id === req.params.id);
-  if (idx !== -1) mockBundles.splice(idx, 1);
-  res.json({ success: true });
+app.put('/api/bundles/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      name, description, bundleType, productIds, bundlePrice, originalPrice,
+      images, seasonalCategory, isFeatured, displayOrder, stockQuantity, isActive,
+    } = req.body;
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (bundleType !== undefined) updates.bundle_type = bundleType;
+    if (productIds !== undefined) updates.product_ids = productIds;
+    if (bundlePrice !== undefined) updates.bundle_price = Number(bundlePrice);
+    if (originalPrice !== undefined) updates.original_price = Number(originalPrice);
+    if (bundlePrice !== undefined && originalPrice !== undefined) {
+      const savingsAmount = Number(originalPrice) - Number(bundlePrice);
+      updates.savings_amount = savingsAmount;
+      updates.discount_percentage = originalPrice > 0 ? Math.round((savingsAmount / originalPrice) * 100) : 0;
+    }
+    if (images !== undefined) updates.images = images;
+    if (seasonalCategory !== undefined) updates.seasonal_category = seasonalCategory;
+    if (isFeatured !== undefined) updates.is_featured = isFeatured;
+    if (displayOrder !== undefined) updates.display_order = displayOrder;
+    if (stockQuantity !== undefined) updates.stock_quantity = Number(stockQuantity);
+    if (isActive !== undefined) updates.is_active = isActive;
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('bundles')
+        .update(updates)
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return res.json({ success: true, bundle: data });
+    }
+
+    const idx = mockBundles.findIndex((b) => b.id === req.params.id);
+    if (idx !== -1) mockBundles[idx] = { ...mockBundles[idx], ...updates };
+    res.json({ success: true, bundle: mockBundles[idx] });
+  } catch (err) {
+    console.error('PUT /api/bundles/:id error:', err);
+    res.status(500).json({ message: err.message || 'Failed to update bundle' });
+  }
+});
+
+app.delete('/api/bundles/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('bundles').delete().eq('id', req.params.id);
+      if (error) throw error;
+      return res.json({ success: true });
+    }
+    const idx = mockBundles.findIndex(b => b.id === req.params.id);
+    if (idx !== -1) mockBundles.splice(idx, 1);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/bundles/:id error:', err);
+    res.status(500).json({ message: 'Failed to delete bundle' });
+  }
 });
 
 // ─── DISCOUNTS (with in-memory fallback) ────────────────────────────────────
@@ -1280,7 +1817,7 @@ app.post('/api/discounts', (req, res) => {
     total_max_uses: req.body.totalMaxUses || 0,
     current_uses: 0,
     start_date: req.body.startDate || new Date().toISOString(),
-    end_date: req.body.endDate || new Date(Date.now() + 30*86400000).toISOString(),
+    end_date: req.body.endDate || new Date(Date.now() + 30 * 86400000).toISOString(),
     min_order_amount: Number(req.body.minOrderAmount) || 0,
     is_stackable: req.body.isStackable || false,
     is_active: true,

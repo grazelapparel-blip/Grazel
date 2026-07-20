@@ -6,7 +6,7 @@
  */
 export function checkReturnEligibility(
   purchaseDate: string | Date,
-  returnWindowDays: number = 30
+  returnWindowDays: number = 7
 ): {
   isEligible: boolean;
   daysLeft: number;

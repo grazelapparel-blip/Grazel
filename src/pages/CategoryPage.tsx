@@ -125,7 +125,7 @@ export function CategoryPage({ category }: CategoryPageProps) {
       </section>
 
       {/* Toolbar - White background */}
-      <section className="py-4 border-b border-border sticky top-[60px] bg-card z-30">
+      <section className="py-4 border-b border-border sticky top-[60px] lg:top-[96px] bg-card z-30">
         <div className="container flex items-center justify-between">
           {/* Left - Filter button (mobile) */}
           <Button

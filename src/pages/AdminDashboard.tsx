@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, TrendingUp, ShoppingCart, Users, Package,
   RotateCcw, BarChart3, Boxes, Truck, FileText,
-  Calendar, MapPin, RefreshCw, Plus, Edit2, Trash2, Tag, Pen
+  Calendar, MapPin, RefreshCw, Plus, Edit2, Trash2, Tag, Pen, Ruler, Download
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,6 +14,7 @@ import {
 import { ProductManager } from '@/components/admin/ProductManager';
 import { DiscountManager } from '@/components/admin/DiscountManager';
 import { ContentManager } from '@/components/admin/ContentManager';
+import { SizeGuideManager } from '@/components/admin/SizeGuideManager';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { useProducts } from '@/context/ProductContext';
 import { toast } from 'sonner';
@@ -22,8 +24,10 @@ const tabs = [
   { id: 'users', label: 'Users', icon: Users },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'products', label: 'Products', icon: Package },
+  { id: 'fitIntelligence', label: 'Fit Intelligence', icon: Ruler },
   { id: 'content', label: 'Content', icon: Pen },
   { id: 'measurements', label: 'Measurements', icon: Boxes },
+  { id: 'sizeGuide', label: 'Size Guide', icon: Ruler },
   { id: 'stock', label: 'Stock', icon: Boxes },
   { id: 'returns', label: 'Returns', icon: RotateCcw },
   { id: 'discounts', label: 'Discounts', icon: Tag },
@@ -52,6 +56,7 @@ export function AdminDashboard() {
   // Dynamic Database State
   const [users, setUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [fitProfiles, setFitProfiles] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
     revenue: 0,
     ordersCount: 0,
@@ -82,7 +87,6 @@ export function AdminDashboard() {
       // Filter to show only regular users (not admins)
       const regularUsersData = allUsersData.filter((u: any) => u.role === 'user');
 
-
       // 2. Fetch Orders List
       let ordersData: any[] = [];
       try {
@@ -96,7 +100,20 @@ export function AdminDashboard() {
         console.warn('Could not fetch orders — continuing without order data');
       }
 
-      // 3. Compute Metrics
+      // 3. Fetch Fit Profiles List
+      try {
+        const fitResp = await fetch('/api/admin/fit-profiles', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (fitResp.ok) {
+          const fitData = await fitResp.json();
+          setFitProfiles(fitData || []);
+        }
+      } catch (err) {
+        console.warn('Could not fetch fit profiles — continuing with defaults', err);
+      }
+
+      // 4. Compute Metrics
       const activeOrders = ordersData || [];
       const totalRevenue = activeOrders
         .filter((o: any) => o.status !== 'Cancelled')
@@ -135,6 +152,32 @@ export function AdminDashboard() {
       if (!response.ok) throw new Error('Failed to update status on server');
       
       toast.success(`Order status updated to ${newStatus}`);
+      
+      // Find the order to get customer email for notifications
+      const updatedOrder = orders.find((o) => o.id === orderId);
+      
+      // Fire status-based email notifications (non-blocking)
+      if (updatedOrder?.customer_email) {
+        const emailMap: Record<string, string> = {
+          'Shipped': '/api/emails/order-shipped',
+          'Delivered': '/api/emails/order-delivered',
+        };
+        const endpoint = emailMap[newStatus];
+        if (endpoint) {
+          fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId,
+              orderNumber: updatedOrder.order_number,
+              customerEmail: updatedOrder.customer_email,
+              trackingNumber: updatedOrder.tracking_number || null,
+              estimatedDeliveryDate: updatedOrder.estimated_delivery_date || null,
+            }),
+          }).catch((err) => console.warn(`${newStatus} email failed (non-critical):`, err));
+        }
+      }
+      
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
@@ -255,8 +298,10 @@ export function AdminDashboard() {
             {active === 'users' && <UsersTab users={users} orders={orders} />}
             {active === 'orders' && <OrdersTab orders={orders} onUpdateStatus={handleUpdateStatus} />}
             {active === 'products' && <ProductsTab />}
+            {active === 'fitIntelligence' && <FitIntelligenceTab fitProfiles={fitProfiles} />}
             {active === 'content' && <ContentTab />}
             {active === 'measurements' && <MeasurementsTab />}
+            {active === 'sizeGuide' && <SizeGuideManager />}
             {active === 'stock' && <StockTab products={products} />}
             {active === 'returns' && <ReturnsTab />}
             {active === 'discounts' && <DiscountsTab />}
@@ -368,11 +413,13 @@ function OverviewTab({ metrics, revenueTrend, categorySplit }: any) {
 
 // 2. Users Tab
 function UsersTab({ users, orders }: { users: any[]; orders: any[] }) {
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+
   const getStats = (userId: string) => {
     const userOrders = orders.filter((o) => o.user_id === userId);
     const count = userOrders.length;
     const spent = userOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
-    return { count, spent };
+    return { count, spent, userOrders };
   };
 
   return (
@@ -386,33 +433,84 @@ function UsersTab({ users, orders }: { users: any[]; orders: any[] }) {
                 <th className="p-4">User ID</th>
                 <th className="p-4">Customer Name</th>
                 <th className="p-4">Email</th>
+                <th className="p-4">Phone</th>
                 <th className="p-4">Joined Date</th>
                 <th className="p-4">Access Level</th>
                 <th className="p-4">Orders Count</th>
                 <th className="p-4 text-right">Total Spent</th>
+                <th className="p-4 text-right">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-light">
               {users.map((u) => {
                 const stats = getStats(u.id);
+                const isExpanded = expandedUser === u.id;
                 return (
-                  <tr key={u.id} className="hover:bg-background-cream/15 transition-colors">
-                    <td className="p-4 font-mono text-xs text-muted-foreground">{u.id.slice(-8)}</td>
-                    <td className="p-4 font-serif text-base">{u.name || 'Valued Customer'}</td>
-                    <td className="p-4">{u.email}</td>
-                    <td className="p-4 text-xs text-muted-foreground">
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="p-4 text-xs">
-                      <span className={`px-2 py-0.5 border capitalize ${
-                        u.role === 'admin' ? 'text-primary bg-primary/5 border-primary/20' : 'text-muted-foreground border-border'
-                      }`}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center font-semibold">{stats.count}</td>
-                    <td className="p-4 text-right font-medium text-foreground">₹{stats.spent.toLocaleString()}</td>
-                  </tr>
+                  <Fragment key={u.id}>
+                    <tr className="hover:bg-background-cream/15 transition-colors">
+                      <td className="p-4 font-mono text-xs text-muted-foreground">{u.id.slice(-8)}</td>
+                      <td className="p-4 font-serif text-base">{u.name || 'Valued Customer'}</td>
+                      <td className="p-4">{u.email}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{u.phone || '—'}</td>
+                      <td className="p-4 text-xs text-muted-foreground">
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="p-4 text-xs">
+                        <span className={`px-2 py-0.5 border capitalize ${
+                          u.role === 'admin' ? 'text-primary bg-primary/5 border-primary/20' : 'text-muted-foreground border-border'
+                        }`}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center font-semibold">{stats.count}</td>
+                      <td className="p-4 text-right font-medium text-foreground">₹{stats.spent.toLocaleString()}</td>
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => setExpandedUser(isExpanded ? null : u.id)}
+                          className="text-xs text-primary underline whitespace-nowrap"
+                        >
+                          {isExpanded ? 'Hide' : 'View Purchases'}
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={9} className="p-0 bg-background-cream/20">
+                          <div className="p-6">
+                            <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-semibold mb-4">
+                              Products Purchased ({stats.userOrders.length} order{stats.userOrders.length !== 1 ? 's' : ''})
+                            </p>
+                            {stats.userOrders.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No purchases yet.</p>
+                            ) : (
+                              <div className="space-y-4">
+                                {stats.userOrders.map((o: any) => (
+                                  <div key={o.id} className="border border-border bg-card p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-muted-foreground">
+                                      <span>Order #{o.id.slice(-8).toUpperCase()} · {new Date(o.created_at).toLocaleDateString()}</span>
+                                      <span className="px-2 py-0.5 border capitalize">{o.status}</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {(o.items || o.order_items || []).map((item: any, idx: number) => (
+                                        <div key={idx} className="flex items-center justify-between text-sm">
+                                          <span className="text-foreground">
+                                            {item.productName || item.product_name} · Size {item.size} · Qty {item.quantity}
+                                          </span>
+                                          <span className="font-medium text-foreground">
+                                            ₹{Number(item.price * item.quantity).toLocaleString()}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -543,56 +641,105 @@ function DiscountsTab() {
 
 // 5. Stock Inventory
 function StockTab({ products }: { products: any[] }) {
-  const stockItems: any[] = [];
-  products.forEach((p) => {
-    p.sizes?.forEach((size: string) => {
-      stockItems.push({
-        // Use product id + size as the unique key to avoid collisions
-        key: `${p.id}-${size}`,
-        sku: `${p.name.slice(0, 3).toUpperCase()}-${(p.color ?? 'NA').slice(0, 2).toUpperCase()}-${size}`,
-        name: `${p.name} · ${p.color ?? ''} · ${size}`,
-        stock: p.stock_quantity ?? (p.id.charCodeAt(0) % 15 || 5),
-        threshold: 5,
+  const [stockOverrides, setStockOverrides] = useState<Record<string, number>>({});
+  const [restockInputs, setRestockInputs] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const getStock = (p: any) => stockOverrides[p.id] ?? (p.stock_quantity ?? 0);
+
+  const handleRestock = async (productId: string) => {
+    const qty = Number(restockInputs[productId]);
+    if (!qty || qty <= 0) {
+      toast.error('Enter a valid quantity to add');
+      return;
+    }
+    const token = localStorage.getItem('grazel_admin_token');
+    setSavingId(productId);
+    try {
+      const response = await fetch(`/api/products/${productId}/restock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ qty }),
       });
-    });
-  });
+      if (!response.ok) throw new Error('Failed to add stock');
+      const updated = await response.json();
+      setStockOverrides((prev) => ({ ...prev, [productId]: updated.stock_quantity ?? (getStock({ id: productId }) + qty) }));
+      setRestockInputs((prev) => ({ ...prev, [productId]: '' }));
+      toast.success(`Added ${qty} units to stock`);
+    } catch (err) {
+      console.error('Error restocking product:', err);
+      toast.error('Failed to add stock');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <SectionTitle>Inventory Levels</SectionTitle>
+      <p className="text-xs text-muted-foreground -mt-4">
+        Stock updates automatically when products are added/edited, and decreases automatically when customers purchase. Use "Add Stock" to top up existing inventory.
+      </p>
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-background-cream/50 border-b border-border">
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                <th className="p-4">SKU Code</th>
-                <th className="p-4">Product Variant</th>
+                <th className="p-4">Product</th>
+                <th className="p-4">Sizes</th>
                 <th className="p-4">Stock Status</th>
                 <th className="p-4 text-right">In Stock</th>
+                <th className="p-4 text-right">Add Stock</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-light">
-              {stockItems.map((s) => {
-                const status = s.stock === 0 ? 'Out' : s.stock < s.threshold ? 'Low' : 'Healthy';
-                return (
-                  <tr key={s.key} className="hover:bg-background-cream/15 transition-colors">
-                    <td className="p-4 font-mono text-xs">{s.sku}</td>
-                    <td className="p-4 font-serif text-base">{s.name}</td>
-                    <td className="p-4 text-xs">
-                      <span className={`px-2 py-0.5 border ${
-                        status === 'Healthy'
-                          ? 'text-green-700 bg-green-50 border-green-200'
-                          : status === 'Low'
-                          ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
-                          : 'text-red-700 bg-red-50 border-red-200'
-                      }`}>
-                        {status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right font-mono font-semibold">{s.stock}</td>
-                  </tr>
-                );
-              })}
+              {products.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-xs text-muted-foreground">No products in catalog yet.</td>
+                </tr>
+              ) : (
+                products.map((p) => {
+                  const stock = getStock(p);
+                  const status = stock === 0 ? 'Out' : stock < 5 ? 'Low' : 'Healthy';
+                  return (
+                    <tr key={p.id} className="hover:bg-background-cream/15 transition-colors">
+                      <td className="p-4 font-serif text-base">{p.name}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{(p.sizes || []).join(', ')}</td>
+                      <td className="p-4 text-xs">
+                        <span className={`px-2 py-0.5 border ${
+                          status === 'Healthy'
+                            ? 'text-green-700 bg-green-50 border-green-200'
+                            : status === 'Low'
+                            ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                            : 'text-red-700 bg-red-50 border-red-200'
+                        }`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-mono font-semibold">{stock}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            value={restockInputs[p.id] || ''}
+                            onChange={(e) => setRestockInputs((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                            placeholder="Qty"
+                            className="w-20 px-2 py-1.5 border border-border bg-background-cream text-sm rounded-none focus:outline-none focus:border-primary"
+                          />
+                          <button
+                            onClick={() => handleRestock(p.id)}
+                            disabled={savingId === p.id}
+                            className="px-3 py-1.5 bg-primary text-primary-foreground text-xs uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          >
+                            {savingId === p.id ? '...' : 'Add'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -655,23 +802,178 @@ function ReturnsTab() {
 
 // 7. Policy Editor
 function PolicyTab() {
-  const policies = [
-    { title: 'Return Window', value: '30 days from delivery' },
-    { title: 'Condition', value: 'Unworn, tags attached, original packaging' },
-    { title: 'Refund Method', value: 'Original payment method, 5–7 business days' },
-    { title: 'Exchanges', value: 'Free size exchange within 30 days' },
-    { title: 'Final Sale', value: 'Marked items, non-returnable' },
-  ];
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newValue, setNewValue] = useState('');
+
+  const authHeaders = () => {
+    const token = localStorage.getItem('grazel_admin_token');
+    return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  };
+
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
+
+  const fetchPolicies = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/return-policies', { headers: authHeaders() });
+      if (!response.ok) throw new Error('Failed to load return policies');
+      const data = await response.json();
+      setPolicies(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching return policies:', err);
+      toast.error('Failed to load return policies');
+      setPolicies([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEdit = (p: any) => {
+    setEditingId(p.id);
+    setEditValue(p.value);
+  };
+
+  const saveEdit = async (id: string) => {
+    try {
+      const response = await fetch(`/api/return-policies/${id}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ value: editValue }),
+      });
+      if (!response.ok) throw new Error('Failed to update');
+      const updated = await response.json();
+      setPolicies((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      setEditingId(null);
+      toast.success('Return policy updated');
+    } catch (err) {
+      console.error('Error updating return policy:', err);
+      toast.error('Failed to update return policy');
+    }
+  };
+
+  const addPolicy = async () => {
+    if (!newTitle.trim() || !newValue.trim()) {
+      toast.error('Both title and value are required');
+      return;
+    }
+    try {
+      const response = await fetch('/api/return-policies', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ title: newTitle.trim(), value: newValue.trim(), sortOrder: policies.length + 1 }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to add policy');
+      }
+      const created = await response.json();
+      setPolicies((prev) => [...prev, created]);
+      setNewTitle('');
+      setNewValue('');
+      toast.success('Return policy added');
+    } catch (err: any) {
+      console.error('Error adding return policy:', err);
+      toast.error(err.message || 'Failed to add return policy');
+    }
+  };
+
+  const deletePolicy = async (id: string) => {
+    try {
+      const response = await fetch(`/api/return-policies/${id}`, { method: 'DELETE', headers: authHeaders() });
+      if (!response.ok) throw new Error('Failed to delete');
+      setPolicies((prev) => prev.filter((p) => p.id !== id));
+      toast.success('Return policy deleted');
+    } catch (err) {
+      console.error('Error deleting return policy:', err);
+      toast.error('Failed to delete return policy');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SectionTitle>Return Policies configuration</SectionTitle>
+      <p className="text-xs text-muted-foreground -mt-4">
+        These entries are stored in the database and shown to customers exactly as written here.
+      </p>
       <Card className="divide-y divide-border-light">
-        {policies.map((p) => (
-          <div key={p.title} className="p-6 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
-            <span className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-semibold">{p.title}</span>
-            <p className="text-sm text-foreground leading-relaxed">{p.value}</p>
-          </div>
-        ))}
+        {loading ? (
+          <p className="p-6 text-xs text-muted-foreground">Loading policies...</p>
+        ) : policies.length === 0 ? (
+          <p className="p-6 text-xs text-muted-foreground">No policy entries yet. Add one below.</p>
+        ) : (
+          policies.map((p) => (
+            <div key={p.id} className="p-6 grid grid-cols-1 lg:grid-cols-[240px_1fr_auto] gap-4 items-start">
+              <span className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-semibold pt-2">{p.title}</span>
+              {editingId === p.id ? (
+                <textarea
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-border bg-background-cream text-foreground text-sm rounded-none focus:outline-none focus:border-primary"
+                />
+              ) : (
+                <p className="text-sm text-foreground leading-relaxed pt-2">{p.value}</p>
+              )}
+              <div className="flex gap-2 pt-2">
+                {editingId === p.id ? (
+                  <button
+                    onClick={() => saveEdit(p.id)}
+                    className="px-3 py-1.5 bg-primary text-primary-foreground text-xs uppercase tracking-wider hover:bg-primary/90 transition-colors"
+                  >
+                    Save
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => startEdit(p)}
+                    className="p-1.5 text-muted-foreground hover:text-primary transition-colors"
+                    title="Edit"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => deletePolicy(p.id)}
+                  className="p-1.5 text-muted-foreground hover:text-red-600 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </Card>
+
+      <Card className="p-6 space-y-3">
+        <h3 className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-semibold">Add Policy Entry</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_auto] gap-3">
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Title (e.g. Return Window)"
+            className="px-3 py-2 border border-border bg-background-cream text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary text-sm rounded-none"
+          />
+          <input
+            type="text"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            placeholder="Value (e.g. 30 days from delivery)"
+            className="px-3 py-2 border border-border bg-background-cream text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary text-sm rounded-none"
+          />
+          <button
+            onClick={addPolicy}
+            className="px-4 py-2 bg-primary text-primary-foreground text-xs uppercase tracking-wider hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> Add
+          </button>
+        </div>
       </Card>
     </div>
   );
@@ -1050,6 +1352,341 @@ function MeasurementsTab() {
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+// 10. Fit Intelligence Submissions & Excel Export Tab
+function FitIntelligenceTab({ fitProfiles: initialFitProfiles }: { fitProfiles: any[] }) {
+  const [profiles, setProfiles] = useState<any[]>(initialFitProfiles || []);
+  const [editingProfile, setEditingProfile] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setProfiles(initialFitProfiles || []);
+  }, [initialFitProfiles]);
+
+  const exportToExcel = () => {
+    if (!profiles || profiles.length === 0) {
+      toast.error('No fit profiles available to export');
+      return;
+    }
+    const headers = ['Profile ID', 'Created Date', 'Customer Name', 'Customer Email', 'Fit Mode', 'Height (cm)', 'Weight (kg)', 'Chest (cm)', 'Waist (cm)', 'Hip (cm)', 'Shoulder (cm)', 'Recommended Size'];
+    const rows = profiles.map((p) => [
+      p.id,
+      new Date(p.created_at || Date.now()).toLocaleDateString(),
+      `"${p.user_name || 'Guest Customer'}"`,
+      `"${p.user_email || 'N/A'}"`,
+      p.type || p.fit_type || 'detailed',
+      p.height || '-',
+      p.weight || '-',
+      p.chest || '-',
+      p.waist || '-',
+      p.hip || '-',
+      p.shoulder_width || '-',
+      p.recommended_size || '-'
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `grazel_fit_intelligence_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Fit Intelligence dataset exported to Excel (CSV)');
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile) return;
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('grazel_admin_token') || localStorage.getItem('grazel_user_token');
+      const response = await fetch(`/api/admin/fit-profiles/${editingProfile.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(editingProfile)
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        setProfiles(prev => prev.map(p => p.id === editingProfile.id ? { ...p, ...updated } : p));
+        toast.success('Fit profile updated successfully');
+        setEditingProfile(null);
+      } else {
+        throw new Error('Failed to update fit profile');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update fit profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const token = localStorage.getItem('grazel_admin_token') || localStorage.getItem('grazel_user_token');
+      const response = await fetch(`/api/admin/fit-profiles/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+
+      if (response.ok) {
+        setProfiles(prev => prev.filter(p => String(p.id) !== String(id)));
+        toast.success('Fit profile deleted');
+      } else {
+        throw new Error('Failed to delete fit profile');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete fit profile');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <SectionTitle>Fit Intelligence Submissions</SectionTitle>
+          <p className="text-xs text-muted-foreground -mt-4">
+            Curated customer fit measurements and AI size recommendations for atelier tailoring.
+          </p>
+        </div>
+        <Button
+          onClick={exportToExcel}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2.5"
+        >
+          <Download className="h-4 w-4" /> Export to Excel (.csv)
+        </Button>
+      </div>
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-background-cream/50 text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-semibold">
+                <th className="py-3.5 px-4">Date</th>
+                <th className="py-3.5 px-4">Customer Name</th>
+                <th className="py-3.5 px-4">Email</th>
+                <th className="py-3.5 px-4">Mode</th>
+                <th className="py-3.5 px-4">Height / Weight</th>
+                <th className="py-3.5 px-4">Chest / Waist</th>
+                <th className="py-3.5 px-4">Recommended Size</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60 text-xs">
+              {profiles.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                    No Curated Fit submissions recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                profiles.map((p) => (
+                  <tr key={p.id} className="hover:bg-background-cream/30 transition-colors">
+                    <td className="py-3.5 px-4 font-mono text-muted-foreground">
+                      {new Date(p.created_at || Date.now()).toLocaleDateString()}
+                    </td>
+                    <td className="py-3.5 px-4 font-medium text-foreground">
+                      {p.user_name || 'Guest Customer'}
+                    </td>
+                    <td className="py-3.5 px-4 text-muted-foreground">
+                      {p.user_email || 'N/A'}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="inline-block px-2 py-0.5 text-[10px] uppercase tracking-wide bg-primary/10 text-primary font-medium rounded-none">
+                        {p.type || p.fit_type || 'detailed'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-foreground">
+                      {p.height ? `${p.height}cm` : '-'} / {p.weight ? `${p.weight}kg` : '-'}
+                    </td>
+                    <td className="py-3.5 px-4 text-foreground">
+                      {p.chest ? `Chest: ${p.chest}cm` : '-'} {p.waist ? `| Waist: ${p.waist}cm` : ''}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-serif font-bold text-sm text-primary">
+                        {p.recommended_size || '-'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => setEditingProfile({ ...p })}
+                          title="Edit Fit Profile"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeletingId(p.id)}
+                          title="Delete Fit Profile"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Edit Fit Profile Modal */}
+      {editingProfile && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-card border border-border w-full max-w-lg p-6 shadow-2xl space-y-4"
+          >
+            <h3 className="font-serif text-lg font-bold text-foreground">Edit Fit Intelligence Profile</h3>
+            <form onSubmit={handleUpdate} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Customer Name</label>
+                  <input
+                    type="text"
+                    value={editingProfile.user_name || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, user_name: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Customer Email</label>
+                  <input
+                    type="email"
+                    value={editingProfile.user_email || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, user_email: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Height (cm)</label>
+                  <input
+                    type="number"
+                    value={editingProfile.height || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, height: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Weight (kg)</label>
+                  <input
+                    type="number"
+                    value={editingProfile.weight || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, weight: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Chest (cm)</label>
+                  <input
+                    type="number"
+                    value={editingProfile.chest || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, chest: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Waist (cm)</label>
+                  <input
+                    type="number"
+                    value={editingProfile.waist || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, waist: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-semibold text-muted-foreground mb-1">Recommended Size</label>
+                  <input
+                    type="text"
+                    value={editingProfile.recommended_size || ''}
+                    onChange={(e) => setEditingProfile({ ...editingProfile, recommended_size: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border text-foreground font-bold"
+                    placeholder="e.g. M, L, S"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingProfile(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingId && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-card border border-border w-full max-w-sm p-6 shadow-2xl space-y-4"
+          >
+            <h3 className="font-serif text-lg font-bold text-foreground">Confirm Deletion</h3>
+            <p className="text-xs text-muted-foreground">
+              Are you sure you want to delete this customer fit profile? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeletingId(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(deletingId)}
+              >
+                Delete Profile
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

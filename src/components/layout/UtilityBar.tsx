@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MapPin, HelpCircle, Package, User } from 'lucide-react';
+import { HelpCircle, Package, User, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const utilityLinks = [
@@ -11,44 +11,46 @@ export function UtilityBar() {
   const { user, signOut } = useAuth();
 
   return (
-    <div className="h-10 bg-background-cream border-b border-border-light">
+    <div className="h-9 bg-background-cream/95 backdrop-blur-md border-b border-border-light text-[11px] select-none">
       <div className="container h-full flex items-center justify-between">
         {/* Left side - Utility Links */}
-        <nav className="flex items-center gap-8">
+        <nav className="flex items-center gap-6">
           {utilityLinks.map((link) => (
             <Link
               key={link.href}
               to={link.href}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors font-medium tracking-wide"
             >
-              <link.icon className="h-3.5 w-3.5" />
+              <link.icon className="h-3.5 w-3.5 text-muted-foreground/80" />
               <span>{link.label}</span>
             </Link>
           ))}
         </nav>
 
-        {/* Right side - Account */}
+        {/* Right side - User Account & Auth */}
         {user ? (
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3.5 text-muted-foreground">
             <Link
               to="/auth"
-              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-foreground font-semibold hover:text-primary transition-colors tracking-wide"
             >
-              <User className="h-3.5 w-3.5" />
+              <User className="h-3.5 w-3.5 text-primary" />
               <span>{user.name || user.email}</span>
             </Link>
+            <span className="text-border-light">|</span>
             <button
               type="button"
               onClick={signOut}
-              className="hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-muted-foreground hover:text-red-700 transition-colors font-medium tracking-wide"
             >
-              Sign Out
+              <LogOut className="h-3 w-3" />
+              <span>Sign Out</span>
             </button>
           </div>
         ) : (
           <Link
             to="/auth"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors font-medium tracking-wide"
           >
             <User className="h-3.5 w-3.5" />
             <span>Sign In</span>

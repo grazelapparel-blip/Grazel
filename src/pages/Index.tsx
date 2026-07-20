@@ -4,7 +4,6 @@ import { CategoryGrid } from '@/components/home/CategoryGrid';
 import { FeaturedProducts } from '@/components/home/FeaturedProducts';
 import { EditorialBanner } from '@/components/home/EditorialBanner';
 import { ExploreMoreSection } from '@/components/community/ExploreMoreSection';
-import { DiscountShowcase } from '@/components/home/DiscountShowcase';
 import { BundleShowcase } from '@/components/bundles/BundleShowcase';
 import { useProducts } from '@/context/ProductContext';
 import heroImage from '@/assets/hero-main.jpg';
@@ -14,15 +13,6 @@ import categoryEssentials from '@/assets/category-essentials.jpg';
 import editorialWool from '@/assets/editorial-wool.jpg';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Tag, Sparkles, Package, Gift, ShieldCheck, Truck } from 'lucide-react';
-
-const seasonalCollections = [
-  { name: 'Summer Collection', href: '/summer-collection', color: 'bg-amber-50 border-amber-200 text-amber-800', emoji: '☀️' },
-  { name: 'Winter Collection', href: '/winter-collection', color: 'bg-blue-50 border-blue-200 text-blue-800', emoji: '❄️' },
-  { name: 'Monsoon Collection', href: '/monsoon-collection', color: 'bg-gray-100 border-gray-300 text-gray-700', emoji: '🌧️' },
-  { name: 'Autumn Collection', href: '/autumn-collection', color: 'bg-orange-50 border-orange-200 text-orange-800', emoji: '🍂' },
-  { name: 'Diwali Collection', href: '/diwali-collection', color: 'bg-yellow-50 border-yellow-200 text-yellow-800', emoji: '🪔' },
-  { name: 'Eid Collection', href: '/eid-collection', color: 'bg-green-50 border-green-200 text-green-800', emoji: '🌙' },
-];
 
 const Index = () => {
   const { products } = useProducts();
@@ -48,31 +38,6 @@ const Index = () => {
         secondaryCta={{ label: 'Shop Men', href: '/men' }}
         height="large"
       />
-
-      {/* Seasonal Collections Strip */}
-      <section className="py-8 bg-card border-b border-border">
-        <div className="container">
-          <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none">
-            <span className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-medium whitespace-nowrap">
-              Seasonal Collections
-            </span>
-            <div className="flex gap-2 flex-nowrap">
-              {seasonalCollections.map((col) => (
-                <Link
-                  key={col.name}
-                  to={col.href}
-                  className={`flex items-center gap-2 px-4 py-2 border ${col.color} whitespace-nowrap hover:opacity-80 transition-opacity text-xs font-medium rounded-sm`}
-                >
-                  <span>{col.emoji}</span>
-                  <span>{col.name}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <DiscountShowcase />
 
       <BundleShowcase />
 
@@ -167,7 +132,7 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="h-5 w-5 text-primary" />
+                  
                   <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">Coming Soon</span>
                 </div>
                 <h2 className="font-serif text-3xl lg:text-4xl text-foreground">

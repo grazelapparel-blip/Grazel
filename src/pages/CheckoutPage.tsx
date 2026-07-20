@@ -283,6 +283,8 @@ export function CheckoutPage() {
 
       const createdOrder = await response.json();
       toast.success('Order placed successfully!');
+      // Fire order confirmation email (non-blocking)
+      sendOrderConfirmationEmail(createdOrder, name, email, finalAmount, cart);
       await clearCart();
       navigate('/review-order', { state: { order: createdOrder } });
     } catch (err: any) {
@@ -291,6 +293,33 @@ export function CheckoutPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Non-blocking helper: sends order confirmation email
+  const sendOrderConfirmationEmail = (
+    order: any,
+    customerName: string,
+    customerEmail: string,
+    totalAmount: number,
+    cartItems: typeof cart
+  ) => {
+    fetch('/api/emails/order-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: order.id || order.order_id,
+        orderNumber: order.order_number || order.orderNumber,
+        customerEmail,
+        customerName,
+        totalAmount,
+        items: cartItems.map((item) => ({
+          productName: item.product.name,
+          size: item.size,
+          quantity: item.quantity,
+          price: item.product.price,
+        })),
+      }),
+    }).catch((err) => console.warn('Order confirmation email failed (non-critical):', err));
   };
 
   // Handle COD order submission
@@ -345,6 +374,8 @@ export function CheckoutPage() {
 
       const createdOrder = await response.json();
       toast.success('Order placed successfully! Please pay on delivery.');
+      // Fire order confirmation email (non-blocking)
+      sendOrderConfirmationEmail(createdOrder, name, email, finalAmount, cart);
       await clearCart();
       navigate('/review-order', { state: { order: createdOrder } });
     } catch (err: any) {

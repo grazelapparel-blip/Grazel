@@ -57,7 +57,7 @@ export function ReviewOrderPage() {
         size: item.size,
         quantity: item.quantity,
         image: matchedProduct?.images?.[0],
-        returnWindowDays: matchedProduct?.returnWindowDays || 30,
+        returnWindowDays: matchedProduct?.returnWindowDays || 7,
       };
     });
   }, [order, products]);

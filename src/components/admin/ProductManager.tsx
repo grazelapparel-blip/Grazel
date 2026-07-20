@@ -14,6 +14,7 @@ interface FormDataWithImages extends Omit<Product, 'id'> {
   discount?: number;
   originalPrice?: number;
   returnWindowDays?: number;
+  stock_quantity?: number;
 }
 
 const defaultProduct: FormDataWithImages = {
@@ -37,6 +38,7 @@ const defaultProduct: FormDataWithImages = {
   composition: '',
   deliveryReturns: '',
   returnWindowDays: 30,
+  stock_quantity: 0,
 };
 
 export function ProductManager({ onProductsChange }: ProductManagerProps) {
@@ -117,6 +119,7 @@ export function ProductManager({ onProductsChange }: ProductManagerProps) {
       deliveryReturns: product.deliveryReturns || '',
       returnWindowDays: product.returnWindowDays || 30,
       tailoredFitMeasurements: product.tailoredFitMeasurements || [],
+      stock_quantity: (product as any).stock_quantity || 0,
     });
     setSelectedMeasurements((product.tailoredFitMeasurements as string[]) || []);
     setImageUrls(product.images || ['/placeholder.svg']);
@@ -241,6 +244,7 @@ export function ProductManager({ onProductsChange }: ProductManagerProps) {
                 <th className="px-6 py-4 font-medium">Price</th>
                 <th className="px-6 py-4 font-medium">Fabric</th>
                 <th className="px-6 py-4 font-medium">Sizes</th>
+                <th className="px-6 py-4 font-medium">Stock</th>
                 <th className="px-6 py-4 text-right font-medium">Actions</th>
               </tr>
             </thead>
@@ -309,6 +313,17 @@ export function ProductManager({ onProductsChange }: ProductManagerProps) {
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs">
+                      <span className={`font-mono font-semibold ${
+                        ((product as any).stock_quantity ?? 0) === 0
+                          ? 'text-red-600'
+                          : ((product as any).stock_quantity ?? 0) < 5
+                          ? 'text-yellow-700'
+                          : 'text-foreground'
+                      }`}>
+                        {(product as any).stock_quantity ?? 0}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
@@ -667,7 +682,7 @@ export function ProductManager({ onProductsChange }: ProductManagerProps) {
                   )}
 
                   <div className="bg-blue-50 border border-blue-200 p-3 rounded text-xs text-blue-700">
-                    <p className="font-semibold mb-1">💡 Get Image URLs (FREE):</p>
+                    <p className="font-semibold mb-1">Get Image URLs (FREE):</p>
                     <ul className="space-y-1 ml-4 list-disc">
                       <li><strong>Cloudinary</strong>: Sign up free → Upload image → Copy URL</li>
                       <li><strong>Imgur</strong>: Upload at imgur.com → Right-click image → Copy Image Address</li>
@@ -745,6 +760,22 @@ export function ProductManager({ onProductsChange }: ProductManagerProps) {
                       Customers can only return this product within the specified number of days from purchase date. The return option will not be shown after this period expires.
                     </p>
                   </div>
+                </div>
+
+                {/* Stock Quantity */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider font-semibold block mb-2 text-muted-foreground">Stock Quantity</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formData.stock_quantity ?? 0}
+                    onChange={(e) => setFormData({ ...formData, stock_quantity: Math.max(0, Number(e.target.value)) })}
+                    className="w-full px-3 py-2 border border-border bg-background-cream text-foreground text-sm rounded-none focus:outline-none focus:border-primary"
+                    placeholder="e.g., 50"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground italic">
+                    Units available for sale. This reduces automatically when customers purchase, and updates here when you add or edit stock.
+                  </p>
                 </div>
 
                 {/* Sizes Selection */}

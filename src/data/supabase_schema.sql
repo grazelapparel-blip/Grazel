@@ -112,6 +112,8 @@ CREATE INDEX idx_measurements_fit_type ON measurements(fit_type);
 CREATE TABLE IF NOT EXISTS fit_profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  user_name TEXT, --It needs to be add in supabase profiles table
+  user_email TEXT, --It needs to be add in supabase profiles table
   fit_type TEXT NOT NULL CHECK (fit_type IN ('simple', 'detailed')),
   -- Simple profile fields
   height DECIMAL(10, 2),
@@ -1345,3 +1347,8 @@ ON CONFLICT (fit_type, name) DO NOTHING;
 -- ✓ Email verification status tracked
 --
 -- ============================================================================
+-- Run this in your Supabase Dashboard -> SQL Editor
+
+ALTER TABLE fit_profiles 
+ADD COLUMN IF NOT EXISTS user_name TEXT,
+ADD COLUMN IF NOT EXISTS user_email TEXT;

@@ -41,7 +41,7 @@ export function FitProfileSelection({ onSelectSimple, onSelectDetailed }: FitPro
               </li>
               <li className="flex items-center gap-3">
                 <span className="text-primary">✓</span>
-                <span className="text-sm text-foreground">AI-powered recommendations</span>
+                <span className="text-sm text-foreground">Smart recommendations</span>
               </li>
             </ul>
 

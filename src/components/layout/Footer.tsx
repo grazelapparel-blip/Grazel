@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, Twitter, Linkedin, Youtube, Mail, Phone, MapPin } from 'lucide-react';
+import { Instagram, Facebook, Twitter, Linkedin, Youtube, Mail, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 const footerLinks = {
@@ -118,15 +118,10 @@ export function Footer() {
                   support@grazel.com
                 </a>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                <a href="tel:+919876543210" className="hover:text-primary transition-colors">
-                  +91 9876543210
-                </a>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>Mumbai, Maharashtra, India</span>
+
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                <span>Tiruppur, Tamil Nadu, India</span>
               </div>
             </div>
 
@@ -181,7 +176,7 @@ export function Footer() {
       <div className="border-t border-border">
         <div className="container py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © 2024 Grazel. All rights reserved.
+            &copy; {new Date().getFullYear()} Grazel. All rights reserved.
           </p>
 
           {/* Social Links - All platforms */}

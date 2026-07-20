@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, MapPin, Send } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -70,7 +70,7 @@ export function ContactUsPage() {
           </div>
 
           {/* Contact Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
             <div className="bg-card border border-border p-8 text-center rounded-sm shadow-mega">
               <Mail className="h-8 w-8 mx-auto mb-4 text-primary" />
               <h3 className="font-medium text-foreground mb-2">Email</h3>
@@ -81,20 +81,12 @@ export function ContactUsPage() {
             </div>
 
             <div className="bg-card border border-border p-8 text-center rounded-sm shadow-mega">
-              <Phone className="h-8 w-8 mx-auto mb-4 text-primary" />
-              <h3 className="font-medium text-foreground mb-2">Phone</h3>
-              <a href="tel:+919876543210" className="text-sm text-primary hover:underline">
-                +91 9876 543 210
-              </a>
-              <p className="text-xs text-muted-foreground mt-2">Mon-Fri, 10 AM - 6 PM</p>
-            </div>
-
-            <div className="bg-card border border-border p-8 text-center rounded-sm shadow-mega">
               <MapPin className="h-8 w-8 mx-auto mb-4 text-primary" />
               <h3 className="font-medium text-foreground mb-2">Address</h3>
               <p className="text-sm text-muted-foreground">
                 Grazel Atelier<br />
-                Mumbai, Maharashtra<br />
+                Tiruppur,<br />
+                Tamil Nadu,<br />
                 India
               </p>
             </div>

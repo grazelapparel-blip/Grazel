@@ -39,8 +39,9 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     careInstructions: p.care_instructions ?? p.careInstructions ?? [],
     composition: p.composition ?? '',
     deliveryReturns: p.delivery_returns ?? p.deliveryReturns ?? '',
-    returnWindowDays: p.return_window_days ?? p.returnWindowDays ?? 30,
+    returnWindowDays: p.return_window_days ?? p.returnWindowDays ?? 7,
     tailoredFitMeasurements: p.tailored_fit_measurements ?? p.tailoredFitMeasurements ?? [],
+    stock_quantity: p.stock_quantity ?? 0,
   });
 
   const fetchProducts = async () => {
@@ -92,7 +93,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     const bodyPayload = {
       ...rest,
       isNewProduct: is_new !== undefined ? is_new : product.isNew,
-      isBestseller: is_bestseller !== undefined ? is_bestseller : product.isBestseller,
+      isBestseller: is_bestseller !== undefined ? is_bestseller : product.isBestSeller,
       isPreOrder: product.isPreOrder ?? false,
       preOrderMessage: product.preOrderMessage,
       images: product.images || ['/placeholder.svg'],
@@ -135,7 +136,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     const bodyPayload = {
       ...rest,
       isNewProduct: is_new !== undefined ? is_new : product.isNew,
-      isBestseller: is_bestseller !== undefined ? is_bestseller : product.isBestseller,
+      isBestseller: is_bestseller !== undefined ? is_bestseller : product.isBestSeller,
       isPreOrder: product.isPreOrder ?? false,
       preOrderMessage: product.preOrderMessage,
       images: product.images || ['/placeholder.svg'],

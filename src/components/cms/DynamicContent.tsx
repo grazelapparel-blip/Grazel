@@ -61,7 +61,7 @@ export function DynamicFooter() {
   return (
     <footer className="bg-background border-t border-border py-8">
       <div className="max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground space-y-4">
-        <p>{copyright?.content || '© 2024 Grazel Atelier. All rights reserved.'}</p>
+        <p>{copyright?.content || '2024 Grazel Atelier. All rights reserved.'}</p>
         {contactEmail && <p>Email: {contactEmail.content}</p>}
         {address && <p>{address.content}</p>}
       </div>

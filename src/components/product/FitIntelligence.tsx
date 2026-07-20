@@ -301,7 +301,7 @@ export function FitIntelligence({ isOpen, onClose, sizes, onRecommend, tailoredF
                               <span className="text-primary mt-0.5">✓</span> Basic height & weight
                             </li>
                             <li className="text-xs text-muted-foreground flex items-start gap-2">
-                              <span className="text-primary mt-0.5">✓</span> AI-powered
+                              <span className="text-primary mt-0.5">✓</span> Smart recommendations
                             </li>
                           </ul>
                         </button>
@@ -552,8 +552,9 @@ export function FitIntelligence({ isOpen, onClose, sizes, onRecommend, tailoredF
                         onChange={(v) => setM({ ...m, weight: v })} 
                         placeholder="72"
                         hint="Your weight in kilograms"
-                        min={40}
+                        min={30}
                         max={150}
+                        unit="kg"
                       />
                       <div>
                         <p className="text-sm font-medium text-foreground mb-4">Select Your Size</p>
@@ -739,10 +740,10 @@ export function FitIntelligence({ isOpen, onClose, sizes, onRecommend, tailoredF
   );
 }
 
-function Field({ label, value, onChange, placeholder, hint, min = 0, max = 300 }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; hint?: string; min?: number; max?: number }) {
+function Field({ label, value, onChange, placeholder, hint, min = 0, max = 300, unit = 'cm' }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; hint?: string; min?: number; max?: number; unit?: string }) {
   const numValue = parseInt(value) || 0;
   const isValid = numValue === 0 || (numValue >= min && numValue <= max);
-  const errorMsg = numValue > max ? `Max ${max}cm` : numValue < min ? `Min ${min}cm` : '';
+  const errorMsg = numValue > max ? `Max ${max}${unit}` : numValue < min ? `Min ${min}${unit}` : '';
   
   return (
     <label className="block">

@@ -31,13 +31,13 @@ export function Header() {
 
   return (
     <>
-      {/* Utility Bar - Cream background, hidden on mobile */}
-      <div className="hidden lg:block">
-        <UtilityBar />
-      </div>
+      {/* Sticky Header Wrapper — keeps Utility Bar & Main Header fixed at top on scroll */}
+      <header className="sticky top-0 z-40 bg-card border-b border-border shadow-sm">
+        {/* Utility Bar - Sticky with header on desktop */}
+        <div className="hidden lg:block">
+          <UtilityBar />
+        </div>
 
-      {/* Main Header - White background */}
-      <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="container h-[60px] flex items-center justify-between">
           {/* Left - Mobile Menu + Logo */}
           <div className="flex items-center gap-4">

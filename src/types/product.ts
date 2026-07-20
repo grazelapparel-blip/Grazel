@@ -21,6 +21,7 @@ export interface Product {
   deliveryReturns?: string;
   returnWindowDays?: number;
   tailoredFitMeasurements?: string[];
+  stock_quantity?: number;
 }
 
 export interface FilterState {

@@ -37,10 +37,23 @@ export function FitProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('grazel_user_token');
     const userId = localStorage.getItem('grazel_user_id');
 
+    const userRaw = localStorage.getItem('grazel_user');
+    let userName = 'Thiru';
+    let userEmail = 'thiru@example.com';
+    if (userRaw) {
+      try {
+        const u = JSON.parse(userRaw);
+        if (u.name) userName = u.name;
+        if (u.email) userEmail = u.email;
+      } catch {}
+    }
+
     try {
       const payload = {
         ...profile,
         userId: userId || null,
+        userName,
+        userEmail,
       };
 
       const response = await fetch('/api/fit-profile', {

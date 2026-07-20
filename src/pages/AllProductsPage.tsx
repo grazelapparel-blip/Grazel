@@ -7,11 +7,6 @@ import { ProductCard } from '@/components/product/ProductCard';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useProducts } from '@/context/ProductContext';
 
-const festivals = [
-  'All Festivals', 'Diwali', 'Holi', 'Eid', 'Christmas', 'New Year',
-  'Pongal', 'Onam', 'Durga Puja', 'Wedding', 'Party',
-] as const;
-
 const sortOptions = [
   { value: 'new', label: 'New Arrivals' },
   { value: 'price-asc', label: 'Price: Low to High' },
@@ -29,7 +24,6 @@ export function AllProductsPage() {
   const allFabrics = Array.from(new Set(
     products.map((p) => p.fabric).filter(Boolean)
   ));
-  const [festival, setFestival] = useState<(typeof festivals)[number]>('All Festivals');
   const [sort, setSort] = useState('new');
   const [gender, setGender] = useState<string[]>([]);
   const [subcat, setSubcat] = useState<string[]>([]);
@@ -42,7 +36,7 @@ export function AllProductsPage() {
   };
 
   const clearAll = () => {
-    setGender([]); setSubcat([]); setFabric([]); setNewOnly(false); setPreOrderOnly(false); setFestival('All Festivals');
+    setGender([]); setSubcat([]); setFabric([]); setNewOnly(false); setPreOrderOnly(false);
   };
 
   const filtered = useMemo(() => {
@@ -59,7 +53,7 @@ export function AllProductsPage() {
       default: r.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
     }
     return r;
-  }, [products, gender, subcat, fabric, newOnly, preOrderOnly, sort, festival]);
+  }, [products, gender, subcat, fabric, newOnly, preOrderOnly, sort]);
 
   const activeCount = gender.length + subcat.length + fabric.length + (newOnly ? 1 : 0) + (preOrderOnly ? 1 : 0);
 
@@ -72,23 +66,6 @@ export function AllProductsPage() {
             <p className="mt-3 text-sm text-muted-foreground">
               {filtered.length} of {products.length} items
             </p>
-
-            {/* Festival tabs */}
-            <div className="mt-10 flex flex-wrap gap-2">
-              {festivals.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFestival(f)}
-                  className={`px-4 py-2 text-xs uppercase tracking-[0.1em] border transition-colors ${
-                    festival === f
-                      ? 'border-foreground text-foreground bg-card'
-                      : 'border-border text-muted-foreground hover:border-primary hover:text-primary bg-card'
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
           </div>
         </section>
 

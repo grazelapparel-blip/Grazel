@@ -30,9 +30,34 @@ import { ContactUsPage } from "./pages/ContactUsPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { CookieConsentBanner } from "./components/layout/CookieConsentBanner";
+import { LoadingScreen } from "./components/layout/LoadingScreen";
 import NotFound from "./pages/NotFound";
 
+import { useState } from 'react';
+
 const queryClient = new QueryClient();
+
+function LoadingApp({ children }: { children: React.ReactNode }) {
+  // Show loading screen only on first page load (not on every navigation)
+  const [ready, setReady] = useState(() => {
+    const seen = sessionStorage.getItem('grazel_loaded');
+    return seen === 'true';
+  });
+
+  const handleComplete = () => {
+    sessionStorage.setItem('grazel_loaded', 'true');
+    setReady(true);
+  };
+
+  return (
+    <>
+      {!ready && <LoadingScreen onComplete={handleComplete} />}
+      <div style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+        {children}
+      </div>
+    </>
+  );
+}
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -98,8 +123,10 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                  <AnimatedRoutes />
-                  <CookieConsentBanner />
+                  <LoadingApp>
+                    <AnimatedRoutes />
+                    <CookieConsentBanner />
+                  </LoadingApp>
                 </BrowserRouter>
               </TooltipProvider>
             </CartProvider>

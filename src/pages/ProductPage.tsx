@@ -20,14 +20,12 @@ type ProductReview = {
   createdAt?: string;
 };
 
-const sizeGuideData = [
-  { size: 'XS', chest: '86-91', waist: '71-76', hip: '86-91', shoulder: '38-40' },
-  { size: 'S', chest: '91-96', waist: '76-81', hip: '91-96', shoulder: '40-42' },
-  { size: 'M', chest: '96-101', waist: '81-86', hip: '96-101', shoulder: '42-44' },
-  { size: 'L', chest: '101-106', waist: '86-91', hip: '101-106', shoulder: '44-46' },
-  { size: 'XL', chest: '106-111', waist: '91-96', hip: '106-111', shoulder: '46-48' },
-  { size: 'XXL', chest: '111-116', waist: '96-101', hip: '111-116', shoulder: '48-50' },
-];
+interface SizeGuideRow {
+  id: string;
+  size_code: string;
+  measurements: Record<string, string>;
+  unit: 'cm' | 'inches';
+}
 
 function convertToInches(cm: string): string {
   const parts = cm.split('-');
@@ -54,6 +52,13 @@ export function ProductPage() {
   const [recommendedSize, setRecommendedSize] = useState<string | null>(null);
   const [sizeUnit, setSizeUnit] = useState<'cm' | 'inches'>('cm');
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [sizeGuideRows, setSizeGuideRows] = useState<SizeGuideRow[]>([]);
+  const [loadingSizeGuide, setLoadingSizeGuide] = useState(false);
+
+  // Scroll to top on every product navigation
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -77,6 +82,28 @@ export function ProductPage() {
 
     loadReviews();
   }, [id]);
+
+  useEffect(() => {
+    if (!product) return;
+
+    const loadSizeGuide = async () => {
+      const productType = product.fitType && product.fitType !== 'none' ? product.fitType : 'other';
+      setLoadingSizeGuide(true);
+      try {
+        const response = await fetch(`/api/size-guides?productType=${productType}&unit=cm`);
+        if (!response.ok) throw new Error('Failed to load size guide');
+        const data = await response.json();
+        setSizeGuideRows(data);
+      } catch (err) {
+        console.error('Error loading size guide:', err);
+        setSizeGuideRows([]);
+      } finally {
+        setLoadingSizeGuide(false);
+      }
+    };
+
+    loadSizeGuide();
+  }, [product?.id, product?.fitType]);
 
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
@@ -311,7 +338,7 @@ export function ProductPage() {
               )}
               {recommendedSize && (
                 <p className="mt-2 text-xs text-primary font-medium">
-                  ✦ Curate My Fit recommends size {recommendedSize}
+                  Curate My Fit recommends size {recommendedSize}
                 </p>
               )}
 
@@ -326,7 +353,7 @@ export function ProductPage() {
                     onClick={() => setShowFit(true)}
                     className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-none border border-primary bg-primary px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
                   >
-                    <Sparkles className="h-4 w-4" /> Curate My Fit
+                    Curate My Fit
                   </button>
                 </div>
               </div>
@@ -384,18 +411,22 @@ export function ProductPage() {
               </Button>
             </div>
 
-            {/* Return Policy Banner */}
-            <div className={`border p-4 text-sm ${isCustomized ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
-              <div className="flex items-start gap-2">
-                <ShieldCheck className={`h-5 w-5 flex-shrink-0 mt-0.5 ${isCustomized ? 'text-amber-600' : 'text-green-600'}`} />
+            {/* Return Policy Banner — Luxury Brand Color Gradient */}
+            <div className={`border p-4 text-sm transition-all shadow-sm ${
+              isCustomized
+                ? 'border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-600/10'
+                : 'border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-amber-900/10'
+            }`}>
+              <div className="flex items-start gap-3">
+                <ShieldCheck className={`h-5 w-5 flex-shrink-0 mt-0.5 ${isCustomized ? 'text-amber-700' : 'text-primary'}`} />
                 <div>
-                  <p className={`font-medium ${isCustomized ? 'text-amber-800' : 'text-green-800'}`}>
-                    {isCustomized ? 'Customized Product — No Returns' : `${returnWindowDays}-Day Return Available`}
+                  <p className={`font-serif font-semibold text-sm tracking-wide ${isCustomized ? 'text-amber-900' : 'text-primary'}`}>
+                    {isCustomized ? 'Customized Product — No Returns' : '7-Day Return Available'}
                   </p>
-                  <p className={`text-xs mt-1 ${isCustomized ? 'text-amber-700' : 'text-green-700'}`}>
+                  <p className={`text-xs mt-1 leading-relaxed ${isCustomized ? 'text-amber-800/80' : 'text-foreground/80'}`}>
                     {isCustomized
                       ? 'This product is made to your specifications and cannot be returned or exchanged.'
-                      : `You can return this product within ${returnWindowDays} days of delivery. Items must be unworn with tags attached.`}
+                      : 'You can return this product within 7 days of delivery. Items must be unworn with original tags attached.'}
                   </p>
                 </div>
               </div>
@@ -588,37 +619,49 @@ export function ProductPage() {
                 </button>
               </div>
 
-              {/* Measurement Chart */}
+              {/* Measurement Chart — admin-managed rows only */}
               <div className="overflow-x-auto mb-6">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b-2 border-border">
-                      <th className="py-3 text-left font-medium text-foreground">Size</th>
-                      <th className="py-3 text-left font-medium text-foreground">Chest</th>
-                      <th className="py-3 text-left font-medium text-foreground">Waist</th>
-                      <th className="py-3 text-left font-medium text-foreground">Hip</th>
-                      <th className="py-3 text-left font-medium text-foreground">Shoulder</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sizeGuideData.map((row) => {
-                      const chest = sizeUnit === 'inches' ? convertToInches(row.chest) : row.chest;
-                      const waist = sizeUnit === 'inches' ? convertToInches(row.waist) : row.waist;
-                      const hip = sizeUnit === 'inches' ? convertToInches(row.hip) : row.hip;
-                      const shoulder = sizeUnit === 'inches' ? convertToInches(row.shoulder) : row.shoulder;
-                      const unit = sizeUnit === 'inches' ? 'in' : 'cm';
-                      return (
-                        <tr key={row.size} className="border-b border-border-light hover:bg-background-cream/50">
-                          <td className="py-3 font-medium">{row.size}</td>
-                          <td className="py-3">{chest} {unit}</td>
-                          <td className="py-3">{waist} {unit}</td>
-                          <td className="py-3">{hip} {unit}</td>
-                          <td className="py-3">{shoulder} {unit}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                {loadingSizeGuide ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">Loading size guide...</p>
+                ) : sizeGuideRows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">
+                    Size guide has not been set up for this product yet.
+                  </p>
+                ) : (
+                  (() => {
+                    const fieldKeys = Array.from(
+                      new Set(sizeGuideRows.flatMap((row) => Object.keys(row.measurements || {})))
+                    );
+                    return (
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-border">
+                            <th className="py-3 text-left font-medium text-foreground">Size</th>
+                            {fieldKeys.map((key) => (
+                              <th key={key} className="py-3 text-left font-medium text-foreground capitalize">{key}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sizeGuideRows.map((row) => {
+                            const unit = sizeUnit === 'inches' ? 'in' : 'cm';
+                            return (
+                              <tr key={row.id} className="border-b border-border-light hover:bg-background-cream/50">
+                                <td className="py-3 font-medium">{row.size_code}</td>
+                                {fieldKeys.map((key) => {
+                                  const raw = row.measurements?.[key];
+                                  if (!raw) return <td key={key} className="py-3">—</td>;
+                                  const value = sizeUnit === 'inches' ? convertToInches(raw) : raw;
+                                  return <td key={key} className="py-3">{value} {unit}</td>;
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  })()
+                )}
               </div>
 
               {/* Measurement Guide Illustration */}
