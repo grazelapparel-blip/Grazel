@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Star, AlertCircle } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductContext';
+import { useAuth } from '@/context/AuthContext';
 import { checkReturnEligibility, getReturnEligibilityMessage } from '@/lib/returnPolicy';
 import { toast } from 'sonner';
 
@@ -37,6 +38,7 @@ export function ReviewOrderPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const { products } = useProducts();
+  const { user } = useAuth();
   const order = (state as any)?.order;
   const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
   const [submittedItems, setSubmittedItems] = useState<string[]>([]);
@@ -75,6 +77,12 @@ export function ReviewOrderPage() {
   };
 
   const submitReview = async (item: ReviewItem) => {
+    if (!user) {
+      toast.error('Please sign in to submit a review');
+      navigate('/auth', { state: { redirectTo: '/review-order' } });
+      return;
+    }
+
     const draft = drafts[item.id];
     if (!draft?.rating) {
       toast.error('Please choose a star rating first');
@@ -129,6 +137,22 @@ export function ReviewOrderPage() {
           </p>
           <Button className="mt-8" onClick={() => navigate('/')}>
             Continue Shopping
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Layout>
+        <div className="container py-20 text-center">
+          <h1 className="font-serif text-3xl text-foreground">Sign in to rate your purchase</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Only signed-in customers who purchased the product can leave a rating and review.
+          </p>
+          <Button className="mt-8" onClick={() => navigate('/auth', { state: { redirectTo: '/review-order' } })}>
+            Sign In
           </Button>
         </div>
       </Layout>

@@ -23,6 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Database & SQL files (never commit)
+*.sql
+scripts/**/*.sql
+
 .vercel
 
 # Environment variables (never commit secrets)

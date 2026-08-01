@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronDown, ChevronRight, Search, User, MapPin, HelpCircle, Package } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, Search, User, HelpCircle, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { megaMenuData, mainNavItems } from '@/data/navigation';
@@ -173,13 +173,13 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
                   <span>Sign In / Register</span>
                 </Link>
               )}
-              <Link
+              {/* <Link
                 to="/stores"
                 onClick={onClose}
                 className="flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 
-              </Link>
+              </Link> */}
               <Link
                 to="/help"
                 onClick={onClose}

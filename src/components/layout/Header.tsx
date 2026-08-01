@@ -1,22 +1,36 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Heart, User, ShoppingBag, Menu } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { Search, Heart, User, ShoppingBag, Menu, HelpCircle, Package, LogOut } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { UtilityBar } from './UtilityBar';
 import { MegaMenu } from './MegaMenu';
 import { SearchOverlay } from './SearchOverlay';
 import { CartDrawer } from './CartDrawer';
 import { MobileMenu } from './MobileMenu';
 import { mainNavItems, megaMenuData } from '@/data/navigation';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 
 export function Header() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const { cartCount, wishlist } = useCart();
+  const { user, signOut } = useAuth();
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isAccountMenuOpen]);
 
   const handleMenuEnter = (label: string) => {
     const menuKey = label.toLowerCase();
@@ -31,13 +45,8 @@ export function Header() {
 
   return (
     <>
-      {/* Sticky Header Wrapper — keeps Utility Bar & Main Header fixed at top on scroll */}
+      {/* Sticky Header Wrapper — keeps Main Header fixed at top on scroll */}
       <header className="sticky top-0 z-40 bg-card border-b border-border shadow-sm">
-        {/* Utility Bar - Sticky with header on desktop */}
-        <div className="hidden lg:block">
-          <UtilityBar />
-        </div>
-
         <div className="container h-[60px] flex items-center justify-between">
           {/* Left - Mobile Menu + Logo */}
           <div className="flex items-center gap-4">
@@ -102,11 +111,73 @@ export function Header() {
               </Button>
             </Link>
 
-            <Link to="/auth" className="hidden sm:block">
-              <Button variant="icon" size="icon" aria-label="Account">
+            <div className="relative hidden sm:block" ref={accountMenuRef}>
+              <Button
+                variant="icon"
+                size="icon"
+                aria-label="Account menu"
+                onClick={() => setIsAccountMenuOpen((open) => !open)}
+              >
                 <User className="h-5 w-5" />
               </Button>
-            </Link>
+
+              <AnimatePresence>
+                {isAccountMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-56 bg-card border border-border shadow-mega z-50 py-2"
+                  >
+                    {user ? (
+                      <>
+                        <div className="px-4 py-2 text-sm text-foreground font-medium truncate">
+                          {user.name || user.email}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            signOut();
+                            setIsAccountMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-red-700 hover:bg-secondary/50 transition-colors"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </>
+                    ) : (
+                      <Link
+                        to="/auth"
+                        onClick={() => setIsAccountMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground font-medium hover:bg-secondary/50 transition-colors"
+                      >
+                        <User className="h-4 w-4" />
+                        <span>Sign In / Sign Up</span>
+                      </Link>
+                    )}
+                    <div className="my-1 border-t border-border-light" />
+                    <Link
+                      to="/help"
+                      onClick={() => setIsAccountMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                      <span>Help</span>
+                    </Link>
+                    <Link
+                      to="/orders"
+                      onClick={() => setIsAccountMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                    >
+                      <Package className="h-4 w-4" />
+                      <span>Orders & Returns</span>
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <Button
               variant="icon"

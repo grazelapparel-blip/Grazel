@@ -278,7 +278,7 @@ export function ProductPage() {
                 {product.fabric} · {product.fit} Fit
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 text-amber-500">
+                <div className="flex items-center gap-1 text-primary">
                   {[1, 2, 3, 4, 5].map((value) => (
                     <Star
                       key={value}
@@ -488,7 +488,7 @@ export function ProductPage() {
                     <div className="flex items-start gap-6">
                       <div className="text-center">
                         <span className="font-serif text-4xl text-foreground">{averageRating.toFixed(1)}</span>
-                        <div className="flex items-center gap-0.5 mt-1 text-amber-500 justify-center">
+                        <div className="flex items-center gap-0.5 mt-1 text-primary justify-center">
                           {[1, 2, 3, 4, 5].map((value) => (
                             <Star
                               key={value}
@@ -509,10 +509,10 @@ export function ProductPage() {
                           return (
                             <div key={star} className="flex items-center gap-2 text-xs">
                               <span className="w-4 text-muted-foreground">{star}</span>
-                              <Star className="h-3 w-3 text-amber-500 fill-current" />
+                              <Star className="h-3 w-3 text-primary fill-current" />
                               <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                                  className="h-full bg-primary rounded-full transition-all duration-500"
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
@@ -528,7 +528,7 @@ export function ProductPage() {
                       {reviews.map((review) => (
                         <article key={review.id} className="border-t border-border-light pt-5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-1 text-amber-500">
+                            <div className="flex items-center gap-1 text-primary">
                               {[1, 2, 3, 4, 5].map((value) => (
                                 <Star
                                   key={value}
@@ -582,19 +582,22 @@ export function ProductPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-foreground/40 z-50"
+              className="fixed inset-0 bg-black/50 z-[45]"
               onClick={() => setShowSizeGuide(false)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-card p-8 z-50 shadow-mega max-h-[90vh] overflow-y-auto"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-lg bg-background-cream border-2 border-foreground p-6 z-50 shadow-2xl max-h-[85vh] overflow-y-auto rounded-sm"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-serif text-xl">Size Guide — {product.name}</h2>
-                <button onClick={() => setShowSizeGuide(false)} className="text-muted-foreground hover:text-foreground">
-                  <X className="h-5 w-5" />
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+                <div>
+                  <h2 className="font-serif text-xl font-semibold text-foreground">Size Guide</h2>
+                  <p className="text-xs text-muted-foreground mt-1">{product.name}</p>
+                </div>
+                <button onClick={() => setShowSizeGuide(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1">
+                  <X className="h-6 w-6" />
                 </button>
               </div>
 
@@ -620,80 +623,86 @@ export function ProductPage() {
               </div>
 
               {/* Measurement Chart — admin-managed rows only */}
-              <div className="overflow-x-auto mb-6">
+              <div className="overflow-x-auto mb-8">
                 {loadingSizeGuide ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">Loading size guide...</p>
+                  <p className="text-sm text-muted-foreground py-8 text-center">Loading size guide...</p>
                 ) : sizeGuideRows.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">
-                    Size guide has not been set up for this product yet.
-                  </p>
+                  <div className="text-center py-8 bg-muted/30 border border-border p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Size guide has not been set up for this product yet.
+                    </p>
+                  </div>
                 ) : (
                   (() => {
                     const fieldKeys = Array.from(
                       new Set(sizeGuideRows.flatMap((row) => Object.keys(row.measurements || {})))
                     );
                     return (
-                      <table className="w-full text-sm border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-border">
-                            <th className="py-3 text-left font-medium text-foreground">Size</th>
-                            {fieldKeys.map((key) => (
-                              <th key={key} className="py-3 text-left font-medium text-foreground capitalize">{key}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sizeGuideRows.map((row) => {
-                            const unit = sizeUnit === 'inches' ? 'in' : 'cm';
-                            return (
-                              <tr key={row.id} className="border-b border-border-light hover:bg-background-cream/50">
-                                <td className="py-3 font-medium">{row.size_code}</td>
-                                {fieldKeys.map((key) => {
-                                  const raw = row.measurements?.[key];
-                                  if (!raw) return <td key={key} className="py-3">—</td>;
-                                  const value = sizeUnit === 'inches' ? convertToInches(raw) : raw;
-                                  return <td key={key} className="py-3">{value} {unit}</td>;
-                                })}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      <div className="border border-border bg-card">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-muted/50 border-b border-border">
+                              <th className="py-3 px-3 text-left font-semibold text-foreground">Size</th>
+                              {fieldKeys.map((key) => (
+                                <th key={key} className="py-3 px-3 text-left font-semibold text-foreground capitalize">{key}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sizeGuideRows.map((row, idx) => {
+                              const unit = sizeUnit === 'inches' ? 'in' : 'cm';
+                              return (
+                                <tr key={row.id} className={`border-b border-border-light ${idx % 2 === 0 ? 'bg-background-cream/40' : ''}`}>
+                                  <td className="py-3 px-3 font-medium text-foreground">{row.size_code}</td>
+                                  {fieldKeys.map((key) => {
+                                    const raw = row.measurements?.[key];
+                                    if (!raw) return <td key={key} className="py-3 px-3 text-muted-foreground">—</td>;
+                                    const value = sizeUnit === 'inches' ? convertToInches(raw) : raw;
+                                    return <td key={key} className="py-3 px-3 text-foreground">{value} {unit}</td>;
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     );
                   })()
                 )}
               </div>
 
               {/* Measurement Guide Illustration */}
-              <div className="bg-background-cream border border-border p-5">
-                <h3 className="text-xs uppercase tracking-[0.15em] text-foreground font-medium mb-4">How to Measure</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-muted-foreground">
-                  <div className="sm:col-span-2 rounded-none border border-border bg-card/70 p-3">
-                    <p className="font-medium text-foreground mb-1">Measurement guide</p>
-                    <p>Measure in a relaxed standing position, keeping the tape level and snug without pulling tight.</p>
+              <div className="mb-6">
+                <h3 className="text-xs uppercase tracking-[0.2em] font-semibold text-foreground mb-4">How to Measure</h3>
+                <div className="space-y-3 text-xs">
+                  <div className="bg-primary/5 border border-primary/20 rounded-sm p-3">
+                    <p className="font-semibold text-foreground mb-1">Measurement Guide</p>
+                    <p className="text-muted-foreground">Measure in a relaxed standing position, keeping the tape level and snug without pulling tight.</p>
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-1">Chest</p>
-                    <p>Measure around the fullest part of your chest, keeping the tape level under your arms.</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-1">Waist</p>
-                    <p>Measure around your natural waistline, typically just above your belly button.</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-1">Hip</p>
-                    <p>Measure around the fullest part of your hips, about 20cm below your waist.</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-1">Shoulder</p>
-                    <p>Measure across your back from the edge of one shoulder to the other.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-muted/20 p-3 border border-border">
+                      <p className="font-semibold text-foreground mb-1">Chest</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">Measure around the fullest part of your chest, keeping the tape level under your arms.</p>
+                    </div>
+                    <div className="bg-muted/20 p-3 border border-border">
+                      <p className="font-semibold text-foreground mb-1">Waist</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">Measure around your natural waistline, typically just above your belly button.</p>
+                    </div>
+                    <div className="bg-muted/20 p-3 border border-border">
+                      <p className="font-semibold text-foreground mb-1">Hip</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">Measure around the fullest part of your hips, about 20cm below your waist.</p>
+                    </div>
+                    <div className="bg-muted/20 p-3 border border-border">
+                      <p className="font-semibold text-foreground mb-1">Shoulder</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">Measure across your back from the edge of one shoulder to the other.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <Button
                 variant="outline"
-                className="mt-6 w-full"
+                className="mt-8 w-full py-3 text-sm uppercase tracking-wider font-medium border-2 border-foreground hover:bg-foreground hover:text-background-cream transition-colors"
                 onClick={() => setShowSizeGuide(false)}
               >
                 Close

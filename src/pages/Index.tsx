@@ -98,13 +98,15 @@ const Index = () => {
       <CategoryGrid categories={categories} />
 
       {/* New Arrivals */}
-      <FeaturedProducts
-        title="New Arrivals"
-        subtitle="The latest additions to our collection"
-        products={newArrivals}
-        viewAllHref="/new"
-        background="cream"
-      />
+      <div className="-mt-20 lg:-mt-28">
+        <FeaturedProducts
+          title="New Arrivals"
+          subtitle="The latest additions to our collection"
+          products={newArrivals}
+          viewAllHref="/new"
+          background="cream"
+        />
+      </div>
 
       {/* Editorial Banner */}
       <EditorialBanner
