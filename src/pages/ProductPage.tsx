@@ -582,14 +582,14 @@ export function ProductPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-[45]"
+              className="fixed inset-0 bg-black/50 z-40 pointer-events-auto"
               onClick={() => setShowSizeGuide(false)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.85, y: 50 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-lg bg-background-cream border-2 border-foreground p-6 z-50 shadow-2xl max-h-[85vh] overflow-y-auto rounded-sm"
+              exit={{ opacity: 0, scale: 0.85, y: 50 }}
+              className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95%] sm:max-w-2xl bg-background-cream border-2 border-foreground p-6 sm:p-8 z-50 shadow-2xl max-h-[90vh] overflow-y-auto rounded-none pointer-events-auto"
             >
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
                 <div>
