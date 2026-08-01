@@ -33,3 +33,5 @@ scripts/**/*.sql
 .env
 .env.local
 .env.*.local
+
+.vercel
