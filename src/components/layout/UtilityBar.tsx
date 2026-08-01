@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { HelpCircle, Package, User, LogOut } from 'lucide-react';
+import { HelpCircle, User, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const utilityLinks = [
   { label: 'Help', href: '/help', icon: HelpCircle },
-  { label: 'Orders & Returns', href: '/orders', icon: Package },
+  // { label: 'Orders & Returns', href: '/orders', icon: Package },
 ];
 
 export function UtilityBar() {
@@ -15,16 +15,19 @@ export function UtilityBar() {
       <div className="container h-full flex items-center justify-between">
         {/* Left side - Utility Links */}
         <nav className="flex items-center gap-6">
-          {utilityLinks.map((link) => (
-            <Link
-              key={link.href}
-              to={link.href}
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors font-medium tracking-wide"
-            >
-              <link.icon className="h-3.5 w-3.5 text-muted-foreground/80" />
-              <span>{link.label}</span>
-            </Link>
-          ))}
+          {utilityLinks.map((link) => {
+            const IconComponent = link.icon;
+            return (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors font-medium tracking-wide"
+              >
+                <IconComponent className="h-3.5 w-3.5 text-muted-foreground/80" />
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Right side - User Account & Auth */}
