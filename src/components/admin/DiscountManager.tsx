@@ -12,6 +12,7 @@ interface DiscountForm {
   appliesTo: 'products' | 'categories' | 'bundles' | 'all';
   startDate: string;
   endDate: string;
+  bundleIds: string[];
 }
 
 interface BundleForm {
@@ -41,6 +42,7 @@ export function DiscountManager() {
     appliesTo: 'all',
     startDate: '',
     endDate: '',
+    bundleIds: [],
   });
   const [bundleForm, setBundleForm] = useState<BundleForm>({
     name: '',
@@ -61,20 +63,24 @@ export function DiscountManager() {
   const loadDiscounts = async () => {
     try {
       const response = await fetch('/api/discounts');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       if (data.success) setDiscounts(data.discounts || []);
     } catch (err) {
       console.error('Failed to load discounts', err);
+      setDiscounts([]);
     }
   };
 
   const loadBundles = async () => {
     try {
       const response = await fetch('/api/bundles');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       if (data.success) setBundles(data.bundles || []);
     } catch (err) {
       console.error('Failed to load bundles', err);
+      setBundles([]);
     }
   };
 
@@ -89,6 +95,15 @@ export function DiscountManager() {
       productIds: prev.productIds.includes(id)
         ? prev.productIds.filter((p) => p !== id)
         : [...prev.productIds, id],
+    }));
+  };
+
+  const toggleDiscountBundle = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      bundleIds: prev.bundleIds.includes(id)
+        ? prev.bundleIds.filter((b) => b !== id)
+        : [...prev.bundleIds, id],
     }));
   };
 
@@ -146,6 +161,11 @@ export function DiscountManager() {
       return;
     }
 
+    if (form.appliesTo === 'bundles' && form.bundleIds.length === 0) {
+      toast.error('Please select at least one bundle');
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await fetch('/api/admin/discounts/create', {
@@ -157,6 +177,7 @@ export function DiscountManager() {
           discountType: form.discountType,
           discountValue: form.discountValue,
           appliesto: form.appliesTo,
+          bundleIds: form.bundleIds,
           startDate: form.startDate,
           endDate: form.endDate,
           maxUses: 1,
@@ -168,7 +189,7 @@ export function DiscountManager() {
 
       if (!response.ok) throw new Error('Unable to create discount');
       toast.success('Discount created successfully');
-      setForm({ code: '', description: '', discountType: 'percentage', discountValue: 10, appliesTo: 'all', startDate: '', endDate: '' });
+      setForm({ code: '', description: '', discountType: 'percentage', discountValue: 10, appliesTo: 'all', startDate: '', endDate: '', bundleIds: [] });
       await loadDiscounts();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create discount');
@@ -324,6 +345,31 @@ export function DiscountManager() {
             <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="w-full border border-border bg-background-cream px-3 py-2" />
           </label>
         </div>
+
+        {form.appliesTo === 'bundles' && (
+          <div className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+              Select Bundles ({form.bundleIds.length} selected)
+            </span>
+            <div className="max-h-56 overflow-y-auto border border-border divide-y divide-border-light">
+              {bundles.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-muted-foreground">No bundles available. Create bundles first.</div>
+              ) : (
+                bundles.map((bundle) => (
+                  <label key={bundle.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-background-cream/50">
+                    <input
+                      type="checkbox"
+                      checked={form.bundleIds.includes(bundle.id)}
+                      onChange={() => toggleDiscountBundle(bundle.id)}
+                    />
+                    <span className="text-foreground">{bundle.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">₹{bundle.bundle_price}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <Button type="submit" disabled={saving}>
           <Plus className="mr-2 h-4 w-4" /> {saving ? 'Creating...' : 'Create Discount'}

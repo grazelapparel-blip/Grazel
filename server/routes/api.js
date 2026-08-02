@@ -394,6 +394,32 @@ async function getDiscountUsageCount(discountId) {
   return discount?.current_uses || 0;
 }
 
+/**
+ * Get All Discounts (Admin/Public)
+ * GET /api/discounts
+ */
+router.get('/discounts', async (req, res) => {
+  try {
+    const db = initializeSupabase();
+    if (!db) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+
+    const { data: discounts, error } = await db
+      .from('discounts')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ success: true, discounts: discounts || [] });
+  } catch (error) {
+    console.error('Error fetching discounts:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================================
 // 4. BUNDLES
 // ============================================================================
@@ -869,6 +895,26 @@ router.get('/brands', async (req, res) => {
 // ============================================================================
 
 /**
+ * Get All Size Guides (Admin)
+ * GET /api/size-guides/all
+ */
+router.get('/size-guides/all', async (req, res) => {
+  try {
+    const { data: guides, error } = await supabase
+      .from('size_guides')
+      .select('*')
+      .order('product_type, size_code');
+
+    if (error) throw error;
+
+    res.status(200).json(guides || []);
+  } catch (error) {
+    console.error('Error fetching all size guides:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get Size Guide by Product Type
  * GET /api/size-guides/:productType
  */
@@ -889,6 +935,94 @@ router.get('/size-guides/:productType', async (req, res) => {
     res.status(200).json({ success: true, guides });
   } catch (error) {
     console.error('Error fetching size guides:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Create Size Guide (Admin)
+ * POST /api/size-guides
+ */
+router.post('/size-guides', async (req, res) => {
+  try {
+    const { productType, sizeCode, unit, measurements } = req.body;
+
+    if (!productType || !sizeCode || !measurements) {
+      return res.status(400).json({ error: 'Product type, size code, and measurements are required' });
+    }
+
+    const { data: guide, error } = await supabase
+      .from('size_guides')
+      .insert([
+        {
+          product_type: productType,
+          size_code: sizeCode.toUpperCase(),
+          unit: unit || 'cm',
+          measurements: measurements,
+          is_active: true,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({ success: true, guide });
+  } catch (error) {
+    console.error('Error creating size guide:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Update Size Guide (Admin)
+ * PUT /api/size-guides/:id
+ */
+router.put('/size-guides/:id', async (req, res) => {
+  try {
+    const { productType, sizeCode, unit, measurements } = req.body;
+
+    if (!productType || !sizeCode || !measurements) {
+      return res.status(400).json({ error: 'Product type, size code, and measurements are required' });
+    }
+
+    const { data: guide, error } = await supabase
+      .from('size_guides')
+      .update({
+        product_type: productType,
+        size_code: sizeCode.toUpperCase(),
+        unit: unit || 'cm',
+        measurements: measurements,
+      })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({ success: true, guide });
+  } catch (error) {
+    console.error('Error updating size guide:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Delete Size Guide (Admin)
+ * DELETE /api/size-guides/:id
+ */
+router.delete('/size-guides/:id', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('size_guides')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (error) throw error;
+
+    res.status(200).json({ success: true, message: 'Size guide deleted' });
+  } catch (error) {
+    console.error('Error deleting size guide:', error);
     res.status(500).json({ error: error.message });
   }
 });
