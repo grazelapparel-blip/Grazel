@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, MapPin, Send } from 'lucide-react';
+import { Mail, MapPin, Send, MessageSquare } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -42,7 +42,7 @@ export function ContactUsPage() {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
-          // Response body was not JSON — use default message
+          // Response body was not JSON
         }
         throw new Error(errorMessage);
       }
@@ -70,15 +70,32 @@ export function ContactUsPage() {
           </div>
 
           {/* Contact Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-            <div className="bg-card border border-border p-8 text-center rounded-sm shadow-mega">
-              <Mail className="h-8 w-8 mx-auto mb-4 text-primary" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            <a 
+              href="mailto:support@grazel.com"
+              className="block bg-card border border-border p-8 text-center rounded-sm shadow-mega hover:border-primary transition-all duration-300 cursor-pointer group"
+            >
+              <Mail className="h-8 w-8 mx-auto mb-4 text-primary group-hover:scale-110 transition-transform" />
               <h3 className="font-medium text-foreground mb-2">Email</h3>
-              <a href="mailto:support@grazel.com" className="text-sm text-primary hover:underline">
+              <span className="text-sm text-primary group-hover:underline">
                 support@grazel.com
-              </a>
+              </span>
               <p className="text-xs text-muted-foreground mt-2">Response time: 24-48 hours</p>
-            </div>
+            </a>
+
+            <a 
+              href="https://wa.me/916385617591" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="block bg-card border border-border p-8 text-center rounded-sm shadow-mega hover:border-primary transition-all duration-300 cursor-pointer group"
+            >
+              <MessageSquare className="h-8 w-8 mx-auto mb-4 text-primary group-hover:scale-110 transition-transform" />
+              <h3 className="font-medium text-foreground mb-2">WhatsApp</h3>
+              <span className="text-sm text-primary hover:underline font-serif">
+                +91 63856 17591
+              </span>
+              <p className="text-xs text-muted-foreground mt-2">Chat with us instantly</p>
+            </a>
 
             <div className="bg-card border border-border p-8 text-center rounded-sm shadow-mega">
               <MapPin className="h-8 w-8 mx-auto mb-4 text-primary" />

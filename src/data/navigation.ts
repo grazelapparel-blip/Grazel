@@ -20,15 +20,16 @@ export interface MegaMenuData {
 export const mainNavItems: NavItem[] = [
   { label: 'Men', href: '/men' },
   { label: 'Women', href: '/women' },
-  { label: 'Essentials', href: '/essentials' },
-  { label: 'New In', href: '/new' },
   { label: 'Collections', href: '/collections' },
-  { label: 'E-Boutique', href: '/e-boutique' },
+  { label: 'Pre-Orders', href: '/all?filter=preorder' },
+  { label: 'About', href: '/help' },
+  { label: 'Size Guide', href: '/help#size-guide' },
+  { label: 'Track Order', href: '/track-order' },
 ];
 
 export const utilityNavItems: NavItem[] = [
   { label: 'Help', href: '/help' },
-  { label: 'Orders & Returns', href: '/orders' },
+  // { label: 'Orders & Returns', href: '/orders' },
 ];
 
 export const megaMenuData: Record<string, MegaMenuData> = {

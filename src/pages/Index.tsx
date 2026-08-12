@@ -2,6 +2,7 @@ import { Layout } from '@/components/layout/Layout';
 import { HeroSection } from '@/components/home/HeroSection';
 import { CategoryGrid } from '@/components/home/CategoryGrid';
 import { FeaturedProducts } from '@/components/home/FeaturedProducts';
+import { ProductGrid } from '@/components/product/ProductGrid';
 import { EditorialBanner } from '@/components/home/EditorialBanner';
 import { ExploreMoreSection } from '@/components/community/ExploreMoreSection';
 import { BundleShowcase } from '@/components/bundles/BundleShowcase';
@@ -131,10 +132,9 @@ const Index = () => {
       {preOrderProducts.length > 0 && (
         <section className="py-20 lg:py-24 bg-card border-t border-b border-border">
           <div className="container">
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
+            <div className="flex flex-col md:items-start gap-4 mb-10">
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  
                   <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">Coming Soon</span>
                 </div>
                 <h2 className="font-serif text-3xl lg:text-4xl text-foreground">
@@ -144,15 +144,19 @@ const Index = () => {
                   Reserve upcoming pieces before they arrive.
                 </p>
               </div>
+            </div>
+            
+            <ProductGrid products={preOrderProducts} columns={4} />
+
+            <div className="mt-12 flex justify-center">
               <Link
-                to="/all"
-                className="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-foreground hover:text-primary transition-colors group"
+                to="/all?filter=preorder"
+                className="flex items-center gap-2 px-6 py-3 border border-primary/20 text-xs uppercase tracking-[0.15em] text-foreground hover:bg-primary/5 hover:text-primary transition-all group"
               >
                 <span>View All Pre-Orders</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
-            <FeaturedProducts title="Pre-Order Now" products={preOrderProducts} columns={4} background="white" />
           </div>
         </section>
       )}

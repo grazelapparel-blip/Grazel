@@ -17,6 +17,31 @@ import Razorpay from 'razorpay';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import emailService from '../services/emailService.js';
+import jwt from 'jsonwebtoken';
+import { mockOrders, mockReviews, mockSizeGuides } from '../memoryDb.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Administrator access required' });
+  }
+  next();
+};
 
 const router = express.Router();
 
@@ -541,34 +566,136 @@ router.get('/orders/:orderId/tracking', async (req, res) => {
  * Track Order by Order Number
  * GET /api/orders/track/:orderNumber
  */
-router.get('/orders/track/:orderNumber', async (req, res) => {
+// Helper to generate dynamic order tracking events based on status
+function generateTrackingEvents(order) {
+  const events = [];
+  const createdAt = new Date(order.created_at || Date.now());
+  
+  events.push({
+    id: 'evt_1',
+    event_title: 'Order Placed',
+    event_description: 'Your order has been successfully placed and is awaiting confirmation.',
+    event_date: createdAt.toISOString(),
+    location: 'Warehouse'
+  });
+
+  const status = (order.status || 'Pending').toLowerCase();
+  if (status === 'pending') return events;
+
+  const confirmedDate = new Date(createdAt.getTime() + 2 * 60 * 60 * 1000);
+  events.push({
+    id: 'evt_2',
+    event_title: 'Order Confirmed',
+    event_description: 'We have confirmed your order and started preparation.',
+    event_date: confirmedDate.toISOString(),
+    location: 'Warehouse'
+  });
+  if (status === 'confirmed') return events.reverse();
+
+  const processingDate = new Date(createdAt.getTime() + 12 * 60 * 60 * 1000);
+  events.push({
+    id: 'evt_3',
+    event_title: 'Processing',
+    event_description: 'Your items are being carefully packed and prepared for shipment.',
+    event_date: processingDate.toISOString(),
+    location: 'Fulfillment Center'
+  });
+  if (status === 'processing') return events.reverse();
+
+  const shippedDate = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+  events.push({
+    id: 'evt_4',
+    event_title: 'Shipped',
+    event_description: `Your order has been shipped. Tracking number: ${order.tracking_number || 'TRK-' + order.id.slice(0, 8).toUpperCase()}`,
+    event_date: shippedDate.toISOString(),
+    location: 'Transit Facility'
+  });
+  if (status === 'shipped' || status === 'in_transit') return events.reverse();
+
+  const outDate = new Date(createdAt.getTime() + 48 * 60 * 60 * 1000);
+  events.push({
+    id: 'evt_5',
+    event_title: 'Out for Delivery',
+    event_description: 'Your package is out with the courier for delivery.',
+    event_date: outDate.toISOString(),
+    location: order.shipping_state || 'Local Hub'
+  });
+  if (status === 'out_for_delivery') return events.reverse();
+
+  const deliveredDate = order.actual_delivery_date ? new Date(order.actual_delivery_date) : new Date(createdAt.getTime() + 56 * 60 * 60 * 1000);
+  events.push({
+    id: 'evt_6',
+    event_title: 'Delivered',
+    event_description: 'Your order has been successfully delivered. Enjoy your purchase!',
+    event_date: deliveredDate.toISOString(),
+    location: order.shipping_state || 'Customer Address'
+  });
+  return events.reverse();
+}
+
+/**
+ * Track Order by Order Number
+ * GET /api/orders/track/:orderNumber
+ */
+router.get('/orders/track/:orderNumber', verifyToken, async (req, res) => {
   try {
     const { orderNumber } = req.params;
+    const userId = req.user.id;
+    const userEmail = req.user.email;
+    const userRole = req.user.role;
 
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('order_number', orderNumber)
-      .single();
+    let order = null;
+    if (supabase) {
+      const { data, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('order_number', orderNumber)
+        .maybeSingle();
 
-    if (orderError || !order) {
+      if (!orderError && data) {
+        order = data;
+      }
+    } else {
+      order = mockOrders.find(o => o.order_number === orderNumber);
+    }
+
+    if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', order.id);
+    // Security ownership check
+    const isOwner = (order.user_id && order.user_id === userId) ||
+                    (order.customer_email && order.customer_email.toLowerCase() === userEmail.toLowerCase());
+    const isAdmin = userRole === 'admin';
 
-    if (itemsError) throw itemsError;
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'You are not authorized to track this order' });
+    }
 
-    const { data: events, error: eventsError } = await supabase
-      .from('order_tracking_events')
-      .select('*')
-      .eq('order_id', order.id)
-      .order('event_date', { ascending: false });
+    // Items are loaded directly from the JSONB items column of orders table (there is no order_items table)
+    const items = order.items || [];
 
-    if (eventsError) throw eventsError;
+    // Events timeline loading or generation
+    let events = [];
+    if (supabase) {
+      try {
+        const { data: dbEvents, error: eventsError } = await supabase
+          .from('order_tracking_events')
+          .select('*')
+          .eq('order_id', order.id)
+          .order('event_date', { ascending: false });
+
+        if (!eventsError && dbEvents && dbEvents.length > 0) {
+          events = dbEvents;
+        } else {
+          events = generateTrackingEvents(order);
+        }
+      } catch {
+        events = generateTrackingEvents(order);
+      }
+    } else {
+      events = generateTrackingEvents(order);
+    }
 
     res.status(200).json({
       success: true,
@@ -577,16 +704,16 @@ router.get('/orders/track/:orderNumber', async (req, res) => {
         orderNumber: order.order_number,
         customerName: order.customer_name,
         customerEmail: order.customer_email,
-        status: order.order_status,
+        status: order.status || 'Pending', // corrected status mapping
         paymentStatus: order.payment_status,
         estimatedDelivery: order.estimated_delivery_date,
         actualDelivery: order.actual_delivery_date,
         trackingNumber: order.tracking_number,
         shippingState: order.shipping_state,
-        subtotal: order.subtotal,
-        shippingCost: order.shipping_cost,
-        tax: order.tax,
-        discount: order.discount,
+        subtotal: order.subtotal || order.total_amount,
+        shippingCost: order.shipping_cost || 0,
+        tax: order.tax || 0,
+        discount: order.discount || 0,
         totalAmount: order.total_amount,
       },
       items,
@@ -898,16 +1025,18 @@ router.get('/brands', async (req, res) => {
  * Get All Size Guides (Admin)
  * GET /api/size-guides/all
  */
-router.get('/size-guides/all', async (req, res) => {
+router.get('/size-guides/all', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const { data: guides, error } = await supabase
-      .from('size_guides')
-      .select('*')
-      .order('product_type, size_code');
+    if (supabase) {
+      const { data: guides, error } = await supabase
+        .from('size_guides')
+        .select('*')
+        .order('product_type, size_code');
 
-    if (error) throw error;
-
-    res.status(200).json(guides || []);
+      if (error) throw error;
+      return res.status(200).json(guides || []);
+    }
+    res.status(200).json(mockSizeGuides || []);
   } catch (error) {
     console.error('Error fetching all size guides:', error);
     res.status(500).json({ error: error.message });
@@ -921,18 +1050,24 @@ router.get('/size-guides/all', async (req, res) => {
 router.get('/size-guides/:productType', async (req, res) => {
   try {
     const { unit = 'cm' } = req.query;
+    const { productType } = req.params;
 
-    const { data: guides, error } = await supabase
-      .from('size_guides')
-      .select('*')
-      .eq('product_type', req.params.productType)
-      .eq('unit', unit)
-      .eq('is_active', true)
-      .order('size_code');
+    if (supabase) {
+      const { data: guides, error } = await supabase
+        .from('size_guides')
+        .select('*')
+        .eq('product_type', productType)
+        .eq('unit', unit)
+        .eq('is_active', true)
+        .order('size_code');
 
-    if (error) throw error;
-
-    res.status(200).json({ success: true, guides });
+      if (error) throw error;
+      return res.status(200).json({ success: true, guides });
+    }
+    const filtered = mockSizeGuides.filter(
+      sg => sg.product_type === productType && sg.unit === unit && sg.is_active
+    );
+    res.status(200).json({ success: true, guides: filtered });
   } catch (error) {
     console.error('Error fetching size guides:', error);
     res.status(500).json({ error: error.message });
@@ -943,7 +1078,7 @@ router.get('/size-guides/:productType', async (req, res) => {
  * Create Size Guide (Admin)
  * POST /api/size-guides
  */
-router.post('/size-guides', async (req, res) => {
+router.post('/size-guides', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { productType, sizeCode, unit, measurements } = req.body;
 
@@ -951,23 +1086,45 @@ router.post('/size-guides', async (req, res) => {
       return res.status(400).json({ error: 'Product type, size code, and measurements are required' });
     }
 
-    const { data: guide, error } = await supabase
-      .from('size_guides')
-      .insert([
-        {
-          product_type: productType,
-          size_code: sizeCode.toUpperCase(),
-          unit: unit || 'cm',
-          measurements: measurements,
-          is_active: true,
-        },
-      ])
-      .select()
-      .single();
+    const payload = {
+      id: `sg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      product_type: productType,
+      size_code: sizeCode.toUpperCase(),
+      unit: unit || 'cm',
+      measurements: measurements,
+      is_active: true,
+    };
 
-    if (error) throw error;
+    if (supabase) {
+      const { data: guide, error } = await supabase
+        .from('size_guides')
+        .insert([
+          {
+            id: payload.id,
+            product_type: payload.product_type,
+            size_code: payload.size_code,
+            unit: payload.unit,
+            measurements: payload.measurements,
+            is_active: payload.is_active,
+          },
+        ])
+        .select()
+        .single();
 
-    res.status(200).json({ success: true, guide });
+      if (error) throw error;
+      return res.status(200).json({ success: true, guide });
+    }
+
+    // In-memory duplicate check
+    const duplicate = mockSizeGuides.some(
+      sg => sg.product_type === productType && sg.size_code === payload.size_code && sg.unit === payload.unit
+    );
+    if (duplicate) {
+      return res.status(409).json({ message: `Size ${payload.size_code} already exists for ${productType} (${payload.unit})` });
+    }
+
+    mockSizeGuides.push(payload);
+    res.status(200).json({ success: true, guide: payload });
   } catch (error) {
     console.error('Error creating size guide:', error);
     res.status(500).json({ error: error.message });
@@ -978,7 +1135,7 @@ router.post('/size-guides', async (req, res) => {
  * Update Size Guide (Admin)
  * PUT /api/size-guides/:id
  */
-router.put('/size-guides/:id', async (req, res) => {
+router.put('/size-guides/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { productType, sizeCode, unit, measurements } = req.body;
 
@@ -986,21 +1143,35 @@ router.put('/size-guides/:id', async (req, res) => {
       return res.status(400).json({ error: 'Product type, size code, and measurements are required' });
     }
 
-    const { data: guide, error } = await supabase
-      .from('size_guides')
-      .update({
+    if (supabase) {
+      const { data: guide, error } = await supabase
+        .from('size_guides')
+        .update({
+          product_type: productType,
+          size_code: sizeCode.toUpperCase(),
+          unit: unit || 'cm',
+          measurements: measurements,
+        })
+        .eq('id', req.params.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return res.status(200).json({ success: true, guide });
+    }
+
+    const index = mockSizeGuides.findIndex(sg => String(sg.id) === String(req.params.id));
+    if (index !== -1) {
+      mockSizeGuides[index] = {
+        ...mockSizeGuides[index],
         product_type: productType,
         size_code: sizeCode.toUpperCase(),
         unit: unit || 'cm',
         measurements: measurements,
-      })
-      .eq('id', req.params.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.status(200).json({ success: true, guide });
+      };
+      return res.status(200).json({ success: true, guide: mockSizeGuides[index] });
+    }
+    res.status(404).json({ error: 'Size guide not found' });
   } catch (error) {
     console.error('Error updating size guide:', error);
     res.status(500).json({ error: error.message });
@@ -1011,16 +1182,25 @@ router.put('/size-guides/:id', async (req, res) => {
  * Delete Size Guide (Admin)
  * DELETE /api/size-guides/:id
  */
-router.delete('/size-guides/:id', async (req, res) => {
+router.delete('/size-guides/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const { error } = await supabase
-      .from('size_guides')
-      .delete()
-      .eq('id', req.params.id);
+    const { id } = req.params;
+    if (supabase) {
+      const { error } = await supabase
+        .from('size_guides')
+        .delete()
+        .eq('id', id);
 
-    if (error) throw error;
+      if (error) throw error;
+      return res.status(200).json({ success: true, message: 'Size guide deleted' });
+    }
 
-    res.status(200).json({ success: true, message: 'Size guide deleted' });
+    const index = mockSizeGuides.findIndex(sg => String(sg.id) === String(id));
+    if (index !== -1) {
+      mockSizeGuides.splice(index, 1);
+      return res.status(200).json({ success: true, message: 'Size guide deleted' });
+    }
+    res.status(404).json({ error: 'Size guide not found' });
   } catch (error) {
     console.error('Error deleting size guide:', error);
     res.status(500).json({ error: error.message });

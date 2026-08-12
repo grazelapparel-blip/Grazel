@@ -182,6 +182,16 @@ export function ReviewOrderPage() {
             </p>
           </div>
 
+          {order && order.status !== 'Delivered' && (
+            <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded-sm flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-sm">Review Submission Restricted</p>
+                <p className="mt-1 opacity-90 text-muted-foreground">Reviews can only be submitted after your order is successfully delivered. Current order status: <span className="font-semibold text-foreground">{order.status}</span>.</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
             {items.map((item) => {
               const draft = drafts[item.id] || { rating: 0, title: '', comment: '' };
@@ -241,8 +251,8 @@ export function ReviewOrderPage() {
                             key={value}
                             type="button"
                             onClick={() => updateDraft(item.id, { rating: value })}
-                            disabled={isSubmitted}
-                            className="text-primary transition-transform hover:scale-110 disabled:hover:scale-100"
+                            disabled={isSubmitted || order.status !== 'Delivered'}
+                            className="text-primary transition-transform hover:scale-110 disabled:hover:scale-100 disabled:opacity-50"
                             aria-label={`${value} star${value > 1 ? 's' : ''}`}
                           >
                             <Star className={`h-7 w-7 ${draft.rating >= value ? 'fill-current' : ''}`} />
@@ -257,7 +267,7 @@ export function ReviewOrderPage() {
                         <input
                           value={draft.title}
                           onChange={(event) => updateDraft(item.id, { title: event.target.value })}
-                          disabled={isSubmitted}
+                          disabled={isSubmitted || order.status !== 'Delivered'}
                           maxLength={120}
                           placeholder="Review title"
                           className="w-full border border-border bg-background-cream px-4 py-3 text-sm outline-none focus:border-primary disabled:opacity-60"
@@ -265,7 +275,7 @@ export function ReviewOrderPage() {
                         <textarea
                           value={draft.comment}
                           onChange={(event) => updateDraft(item.id, { comment: event.target.value })}
-                          disabled={isSubmitted}
+                          disabled={isSubmitted || order.status !== 'Delivered'}
                           maxLength={1000}
                           rows={4}
                           placeholder="What did you like about the product?"
@@ -276,7 +286,7 @@ export function ReviewOrderPage() {
                       <div className="mt-5 flex flex-wrap gap-3">
                         <Button
                           onClick={() => submitReview(item)}
-                          disabled={isSubmitted || submitting === item.id}
+                          disabled={isSubmitted || order.status !== 'Delivered' || submitting === item.id}
                         >
                           {submitting === item.id ? 'Submitting...' : isSubmitted ? 'Review Submitted' : 'Submit Review'}
                         </Button>

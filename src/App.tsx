@@ -32,8 +32,17 @@ import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import { CookieConsentBanner } from "./components/layout/CookieConsentBanner";
 import { LoadingScreen } from "./components/layout/LoadingScreen";
 import NotFound from "./pages/NotFound";
+import { useEffect, useState } from 'react';
 
-import { useState } from 'react';
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -123,6 +132,7 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                  <ScrollToTop />
                   <LoadingApp>
                     <AnimatedRoutes />
                     <CookieConsentBanner />

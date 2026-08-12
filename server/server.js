@@ -36,15 +36,7 @@ if (supabaseUrl && supabaseServiceKey) {
 const SALT_ROUNDS = 10;
 const DEFAULT_ADMIN_HASH = String(bcrypt.hashSync('admin123', SALT_ROUNDS));
 
-const mockUsers = new Map();
-mockUsers.set('admin@grazel.com', {
-  id: 'admin_001',
-  email: 'admin@grazel.com',
-  name: 'Grazel Admin',
-  role: 'admin',
-  password_hash: DEFAULT_ADMIN_HASH,
-  created_at: new Date().toISOString(),
-});
+import { mockUsers, mockOrders, mockReviews, mockSizeGuides } from './memoryDb.js';
 
 // ─── Startup: verify Supabase tables exist, then seed admin ─────────────────
 // If the schema hasn't been run yet, we disable Supabase entirely so every
@@ -833,7 +825,7 @@ app.get('/api/orders', verifyToken, requireAdmin, async (req, res) => {
       if (error) throw error;
       return res.json(data || []);
     }
-    res.json([]);
+    res.json(mockOrders);
   } catch (err) {
     console.error('GET /api/orders error:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
@@ -853,7 +845,8 @@ app.get('/api/orders/my', verifyToken, async (req, res) => {
       if (error) throw error;
       return res.json(data || []);
     }
-    res.json([]);
+    const myOrders = mockOrders.filter(o => o.user_id === userId || (o.customer_email && o.customer_email.toLowerCase() === req.user.email.toLowerCase()));
+    res.json(myOrders);
   } catch (err) {
     console.error('GET /api/orders/my error:', err);
     res.status(500).json({ error: 'Failed to fetch your orders' });
@@ -944,6 +937,7 @@ app.post('/api/orders', async (req, res) => {
       created_at: now,
       updated_at: now,
     };
+    mockOrders.push(order);
     res.status(201).json(order);
   } catch (err) {
     console.error('POST /api/orders error:', err);
@@ -970,6 +964,12 @@ app.put('/api/orders/:id/status', verifyToken, requireAdmin, async (req, res) =>
       if (error) throw error;
       return res.json(data);
     }
+    const orderIdx = mockOrders.findIndex(o => o.id === req.params.id);
+    if (orderIdx !== -1) {
+      mockOrders[orderIdx].status = status;
+      mockOrders[orderIdx].updated_at = new Date().toISOString();
+      return res.json(mockOrders[orderIdx]);
+    }
     res.json({ id: req.params.id, status });
   } catch (err) {
     console.error('PUT /api/orders/:id/status error:', err);
@@ -994,17 +994,80 @@ app.get('/api/reviews', async (req, res) => {
       if (error) throw error;
       return res.json(data || []);
     }
-    res.json([]);
+    const filtered = productId ? mockReviews.filter(r => r.product_id === productId) : mockReviews;
+    res.json(filtered);
   } catch (err) {
     console.error('GET /api/reviews error:', err);
     res.status(500).json({ error: 'Failed to fetch reviews' });
   }
 });
 
-// POST a review (after checkout)
-app.post('/api/reviews', async (req, res) => {
+// GET review eligibility for a product (logged-in user only)
+app.get('/api/reviews/eligibility', verifyToken, async (req, res) => {
+  try {
+    const { productId } = req.query;
+    const userId = req.user.id;
+    const email = req.user.email;
+
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required' });
+    }
+
+    let ordersList = [];
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .or(`user_id.eq.${userId},customer_email.eq.${email}`);
+      if (error) throw error;
+      ordersList = data || [];
+    } else {
+      ordersList = mockOrders.filter(o => o.user_id === userId || (o.customer_email && o.customer_email.toLowerCase() === email.toLowerCase()));
+    }
+
+    const deliveredOrders = ordersList.filter(o => o.status === 'Delivered');
+    const purchasedOrder = deliveredOrders.find(o => {
+      const items = o.items || [];
+      return items.some(item => String(item.productId) === String(productId));
+    });
+
+    if (!purchasedOrder) {
+      return res.json({ eligible: false, reason: 'not_purchased' });
+    }
+
+    // Check if already reviewed
+    let reviewed = false;
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('id')
+        .eq('product_id', productId)
+        .eq('user_id', userId)
+        .limit(1);
+      if (!error && data && data.length > 0) {
+        reviewed = true;
+      }
+    } else {
+      reviewed = mockReviews.some(r => r.product_id === productId && r.user_id === userId);
+    }
+
+    if (reviewed) {
+      return res.json({ eligible: false, reason: 'already_reviewed' });
+    }
+
+    res.json({ eligible: true });
+  } catch (err) {
+    console.error('GET /api/reviews/eligibility error:', err);
+    res.status(500).json({ error: 'Failed to verify eligibility' });
+  }
+});
+
+// POST a review (after checkout, requires verified delivered purchase)
+app.post('/api/reviews', verifyToken, async (req, res) => {
   try {
     const { productId, productName, orderId, orderItemId, customerName, rating, title, comment } = req.body;
+    const userId = req.user.id;
+    const userEmail = req.user.email;
 
     if (!productId || !customerName || !rating) {
       return res.status(400).json({ message: 'productId, customerName and rating are required' });
@@ -1013,10 +1076,26 @@ app.post('/api/reviews', async (req, res) => {
       return res.status(400).json({ message: 'rating must be between 1 and 5' });
     }
 
-    const token = req.headers.authorization?.split(' ')[1];
-    let userId = null;
-    if (token) {
-      try { userId = jwt.verify(token, JWT_SECRET)?.id; } catch { }
+    // 1. Verify eligibility (must have purchased and been delivered)
+    let ordersList = [];
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .or(`user_id.eq.${userId},customer_email.eq.${userEmail}`);
+      if (!error) ordersList = data || [];
+    } else {
+      ordersList = mockOrders.filter(o => o.user_id === userId || (o.customer_email && o.customer_email.toLowerCase() === userEmail.toLowerCase()));
+    }
+
+    const deliveredOrders = ordersList.filter(o => o.status === 'Delivered');
+    const purchasedOrder = deliveredOrders.find(o => {
+      const items = o.items || [];
+      return items.some(item => String(item.productId) === String(productId));
+    });
+
+    if (!purchasedOrder) {
+      return res.status(403).json({ message: 'You can only review products from orders that have been successfully delivered.' });
     }
 
     const reviewId = `rev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -1028,7 +1107,7 @@ app.post('/api/reviews', async (req, res) => {
         .insert([{
           id: reviewId,
           product_id: productId,
-          order_id: orderId || null,
+          order_id: orderId || purchasedOrder.id,
           order_item_id: orderItemId || null,
           user_id: userId,
           customer_name: customerName,
@@ -1052,7 +1131,28 @@ app.post('/api/reviews', async (req, res) => {
       return res.status(201).json(data);
     }
 
-    res.status(201).json({ id: reviewId, product_id: productId, rating, customer_name: customerName, created_at: now });
+    // Local in-memory duplicate check
+    const alreadyReviewed = mockReviews.some(r => r.product_id === productId && r.user_id === userId);
+    if (alreadyReviewed) {
+      return res.status(409).json({ message: 'You have already reviewed this item' });
+    }
+
+    const review = {
+      id: reviewId,
+      product_id: productId,
+      order_id: orderId || purchasedOrder.id,
+      order_item_id: orderItemId || null,
+      user_id: userId,
+      customer_name: customerName,
+      rating,
+      title: title || null,
+      comment: comment || null,
+      is_approved: true,
+      created_at: now,
+      updated_at: now,
+    };
+    mockReviews.push(review);
+    res.status(201).json(review);
   } catch (err) {
     console.error('POST /api/reviews error:', err);
     res.status(500).json({ message: err.message || 'Failed to save review' });
@@ -1212,7 +1312,7 @@ app.post('/api/fit-profile', async (req, res) => {
   }
 });
 
-app.get('/api/admin/fit-profiles', async (req, res) => {
+app.get('/api/admin/fit-profiles', verifyToken, requireAdmin, async (req, res) => {
   try {
     if (supabase) {
       const { data, error } = await supabase
@@ -1248,7 +1348,7 @@ app.get('/api/admin/fit-profiles', async (req, res) => {
 });
 
 // PUT / update fit profile (Admin)
-app.put('/api/admin/fit-profiles/:id', async (req, res) => {
+app.put('/api/admin/fit-profiles/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -1286,7 +1386,7 @@ app.put('/api/admin/fit-profiles/:id', async (req, res) => {
 });
 
 // DELETE fit profile (Admin)
-app.delete('/api/admin/fit-profiles/:id', async (req, res) => {
+app.delete('/api/admin/fit-profiles/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1426,7 +1526,10 @@ app.get('/api/size-guides', async (req, res) => {
       if (error) throw error;
       return res.json(data || []);
     }
-    res.json([]);
+    const filtered = mockSizeGuides.filter(
+      sg => (!productType || sg.product_type === productType) && (!unit || sg.unit === unit) && sg.is_active
+    );
+    res.json(filtered);
   } catch (err) {
     console.error('GET /api/size-guides error:', err);
     res.status(500).json({ error: 'Failed to fetch size guides' });
@@ -1445,7 +1548,7 @@ app.get('/api/size-guides/all', verifyToken, requireAdmin, async (req, res) => {
       if (error) throw error;
       return res.json(data || []);
     }
-    res.json([]);
+    res.json(mockSizeGuides || []);
   } catch (err) {
     console.error('GET /api/size-guides/all error:', err);
     res.status(500).json({ error: 'Failed to fetch size guides' });
@@ -1486,6 +1589,16 @@ app.post('/api/size-guides', verifyToken, requireAdmin, async (req, res) => {
       }
       return res.status(201).json(data);
     }
+    
+    // Duplicate check
+    const duplicate = mockSizeGuides.some(
+      sg => sg.product_type === productType && sg.size_code === sizeCode && sg.unit === unit
+    );
+    if (duplicate) {
+      return res.status(409).json({ message: `Size ${sizeCode} already exists for ${productType} (${unit})` });
+    }
+
+    mockSizeGuides.push(payload);
     res.status(201).json(payload);
   } catch (err) {
     console.error('POST /api/size-guides error:', err);
@@ -1514,7 +1627,18 @@ app.put('/api/size-guides/:id', verifyToken, requireAdmin, async (req, res) => {
       if (error) throw error;
       return res.json(data);
     }
-    res.json({ id: req.params.id, ...req.body });
+    
+    const index = mockSizeGuides.findIndex(sg => String(sg.id) === String(req.params.id));
+    if (index !== -1) {
+      mockSizeGuides[index] = {
+        ...mockSizeGuides[index],
+        ...req.body,
+        size_code: sizeCode ? sizeCode.toUpperCase() : mockSizeGuides[index].size_code,
+        updated_at: new Date().toISOString(),
+      };
+      return res.json(mockSizeGuides[index]);
+    }
+    res.status(404).json({ error: 'Size guide not found' });
   } catch (err) {
     console.error('PUT /api/size-guides/:id error:', err);
     res.status(500).json({ message: 'Failed to update size guide' });
@@ -1532,7 +1656,13 @@ app.delete('/api/size-guides/:id', verifyToken, requireAdmin, async (req, res) =
       if (error) throw error;
       return res.json({ message: 'Size guide row deleted' });
     }
-    res.json({ message: 'Size guide row deleted' });
+    
+    const index = mockSizeGuides.findIndex(sg => String(sg.id) === String(req.params.id));
+    if (index !== -1) {
+      mockSizeGuides.splice(index, 1);
+      return res.json({ message: 'Size guide row deleted' });
+    }
+    res.status(404).json({ error: 'Size guide not found' });
   } catch (err) {
     console.error('DELETE /api/size-guides/:id error:', err);
     res.status(500).json({ message: 'Failed to delete size guide' });

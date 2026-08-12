@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Search, Package, Truck, MapPin, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Package, Truck, MapPin, Calendar, CheckCircle, AlertCircle, User } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 
 interface OrderTracking {
   id: string;
@@ -63,9 +65,13 @@ export function OrderTrackingPage() {
     setHasSearched(true);
     
     try {
+      const token = localStorage.getItem('grazel_user_token') || localStorage.getItem('grazel_admin_token');
       const response = await fetch(`/api/orders/track/${searchQuery.trim()}`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
       });
 
       if (!response.ok) {
@@ -76,17 +82,42 @@ export function OrderTrackingPage() {
       const data = await response.json();
       if (data.success) {
         setOrder(data.order);
+        setItems(data.items || []);
         setEvents(data.events || []);
       }
     } catch (err: any) {
       console.error('Search error:', err);
       toast.error(err.message || 'Unable to find order');
       setOrder(null);
+      setItems([]);
       setEvents([]);
     } finally {
       setIsSearching(false);
     }
   };
+
+  if (!user) {
+    return (
+      <Layout>
+        <div className="min-h-[calc(100vh-60px)] bg-background-cream py-16 flex items-center justify-center">
+          <div className="container max-w-md">
+            <div className="bg-card border border-border p-8 shadow-mega text-center rounded-sm">
+              <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h2 className="font-serif text-2xl text-foreground mb-3">Sign In Required</h2>
+              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                Please sign in to track order details and access delivery updates.
+              </p>
+              <Link to="/auth?redirect=track-order">
+                <Button className="w-full text-xs uppercase tracking-[0.2em] font-medium py-3">
+                  Sign In
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const paymentStatusConfig: Record<string, { color: string; label: string }> = {
     pending: { color: 'text-yellow-600', label: 'Pending' },
@@ -287,6 +318,41 @@ export function OrderTrackingPage() {
                           {event.notes && (
                             <p className="text-xs text-muted-foreground mt-2 italic">Note: {event.notes}</p>
                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ordered Items */}
+              {items && items.length > 0 && (
+                <div className="bg-card border border-border p-8 shadow-mega">
+                  <h3 className="font-serif text-lg text-foreground mb-6">Items in Your Order</h3>
+                  <div className="divide-y divide-border/60">
+                    {items.map((item, idx) => (
+                      <div key={idx} className="py-4 first:pt-0 last:pb-0 flex gap-4 items-center">
+                        {item.image && (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-16 h-20 object-cover border border-border bg-background-cream"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h4 className="font-medium text-foreground text-sm leading-tight">{item.name}</h4>
+                          <div className="mt-1 text-xs text-muted-foreground flex flex-wrap gap-x-4">
+                            {item.size && <span>Size: <span className="text-foreground font-medium">{item.size}</span></span>}
+                            <span>Quantity: <span className="text-foreground font-medium">{item.quantity}</span></span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-foreground">
+                            ₹{(item.price * item.quantity).toFixed(2)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            ₹{item.price} each
+                          </p>
                         </div>
                       </div>
                     ))}

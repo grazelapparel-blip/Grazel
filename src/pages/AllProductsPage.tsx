@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
@@ -28,8 +29,26 @@ export function AllProductsPage() {
   const [gender, setGender] = useState<string[]>([]);
   const [subcat, setSubcat] = useState<string[]>([]);
   const [fabric, setFabric] = useState<string[]>([]);
-  const [newOnly, setNewOnly] = useState(true);
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [newOnly, setNewOnly] = useState(false);
   const [preOrderOnly, setPreOrderOnly] = useState(false);
+
+  useEffect(() => {
+    const filter = searchParams.get('filter');
+    const isNewPath = location.pathname === '/new';
+    
+    if (filter === 'preorder') {
+      setPreOrderOnly(true);
+      setNewOnly(false);
+    } else if (filter === 'new' || isNewPath) {
+      setNewOnly(true);
+      setPreOrderOnly(false);
+    } else {
+      setNewOnly(false);
+      setPreOrderOnly(false);
+    }
+  }, [searchParams, location.pathname]);
 
   const toggle = (arr: string[], val: string, set: (v: string[]) => void) => {
     set(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val]);

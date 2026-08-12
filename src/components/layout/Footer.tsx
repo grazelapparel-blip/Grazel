@@ -37,7 +37,6 @@ const footerLinks = {
       { label: 'Sustainability', href: '/collections' },
       { label: 'Careers', href: '/contact' },
       { label: 'Press', href: '/contact' },
-      { label: 'E-Boutique', href: '/e-boutique' },
       { label: 'Cookie Policy', href: '/cookies' },
       { label: 'Privacy Policy', href: '/privacy' },
     ],

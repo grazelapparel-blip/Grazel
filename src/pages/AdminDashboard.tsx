@@ -1,10 +1,10 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, TrendingUp, ShoppingCart, Users, Package,
   RotateCcw, BarChart3, Boxes, Truck, FileText,
-  Calendar, MapPin, RefreshCw, Plus, Edit2, Trash2, Tag, Pen, Ruler, Download
+  Calendar, MapPin, RefreshCw, Plus, Edit2, Trash2, Tag, Pen, Ruler, Download, Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -1362,6 +1362,18 @@ function FitIntelligenceTab({ fitProfiles: initialFitProfiles }: { fitProfiles: 
   const [editingProfile, setEditingProfile] = useState<any | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProfiles = useMemo(() => {
+    if (!searchQuery.trim()) return profiles;
+    const query = searchQuery.toLowerCase().trim();
+    return profiles.filter((p) => 
+      (p.user_email && p.user_email.toLowerCase().includes(query)) ||
+      (p.user_name && p.user_name.toLowerCase().includes(query)) ||
+      (p.user_id && String(p.user_id).toLowerCase().includes(query)) ||
+      (p.id && String(p.id).toLowerCase().includes(query))
+    );
+  }, [profiles, searchQuery]);
 
   useEffect(() => {
     setProfiles(initialFitProfiles || []);
@@ -1470,6 +1482,28 @@ function FitIntelligenceTab({ fitProfiles: initialFitProfiles }: { fitProfiles: 
         </Button>
       </div>
 
+      <div className="flex gap-2 max-w-md">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by customer email, name, or ID..."
+            className="w-full pl-9 pr-4 py-2 border border-border bg-background-cream text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary text-xs rounded-none"
+          />
+        </div>
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            onClick={() => setSearchQuery('')}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -1486,14 +1520,14 @@ function FitIntelligenceTab({ fitProfiles: initialFitProfiles }: { fitProfiles: 
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 text-xs">
-              {profiles.length === 0 ? (
+              {filteredProfiles.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-muted-foreground">
-                    No Curated Fit submissions recorded yet.
+                    No matching fit profiles found.
                   </td>
                 </tr>
               ) : (
-                profiles.map((p) => (
+                filteredProfiles.map((p) => (
                   <tr key={p.id} className="hover:bg-background-cream/30 transition-colors">
                     <td className="py-3.5 px-4 font-mono text-muted-foreground">
                       {new Date(p.created_at || Date.now()).toLocaleDateString()}

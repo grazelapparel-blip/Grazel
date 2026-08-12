@@ -87,7 +87,20 @@ export function ProductPage() {
     if (!product) return;
 
     const loadSizeGuide = async () => {
-      const productType = product.fitType && product.fitType !== 'none' ? product.fitType : 'other';
+      let productType = 'top'; // default
+      const subcat = (product.subcategory || '').toLowerCase();
+      const cat = (product.category || '').toLowerCase();
+
+      if (['shirt', 'shirts', 'blazer', 'blazers', 'knitwear', 'outerwear', 'jacket', 'jackets', 't-shirt', 't-shirts', 'polos'].some(s => subcat.includes(s) || cat.includes(s))) {
+        productType = 'top';
+      } else if (['trouser', 'trousers', 'skirt', 'skirts', 'pants'].some(s => subcat.includes(s) || cat.includes(s))) {
+        productType = 'bottom';
+      } else if (['dress', 'dresses'].some(s => subcat.includes(s) || cat.includes(s))) {
+        productType = 'dress';
+      } else if (product.fitType && product.fitType !== 'none') {
+        productType = product.fitType;
+      }
+
       setLoadingSizeGuide(true);
       try {
         const response = await fetch(`/api/size-guides?productType=${productType}&unit=cm`);
@@ -103,7 +116,7 @@ export function ProductPage() {
     };
 
     loadSizeGuide();
-  }, [product?.id, product?.fitType]);
+  }, [product?.id, product?.fitType, product?.category, product?.subcategory]);
 
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
@@ -577,19 +590,19 @@ export function ProductPage() {
       {/* Enhanced Size Guide Modal */}
       <AnimatePresence>
         {showSizeGuide && (
-          <>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto pointer-events-none">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-40 pointer-events-auto"
+              className="fixed inset-0 bg-black/60 pointer-events-auto"
               onClick={() => setShowSizeGuide(false)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.85, y: 50 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.85, y: 50 }}
-              className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95%] sm:max-w-2xl bg-background-cream border-2 border-foreground p-6 sm:p-8 z-50 shadow-2xl max-h-[90vh] overflow-y-auto rounded-none pointer-events-auto"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-2xl bg-background-cream border border-border p-6 sm:p-8 shadow-mega max-h-[90vh] overflow-y-auto rounded-none pointer-events-auto flex flex-col z-10"
             >
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
                 <div>
@@ -702,13 +715,13 @@ export function ProductPage() {
 
               <Button
                 variant="outline"
-                className="mt-8 w-full py-3 text-sm uppercase tracking-wider font-medium border-2 border-foreground hover:bg-foreground hover:text-background-cream transition-colors"
+                className="mt-8 w-full py-3 text-sm uppercase tracking-wider font-medium border border-border hover:bg-foreground hover:text-background-cream transition-colors"
                 onClick={() => setShowSizeGuide(false)}
               >
                 Close
               </Button>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
 
